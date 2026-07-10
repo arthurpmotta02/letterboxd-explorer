@@ -115,6 +115,7 @@ def enrich(
     offline: bool = False,
     cache_path: Path = DEFAULT_CACHE,
     retry_misses: bool = False,
+    refresh: list[str] | None = None,
 ) -> pd.DataFrame:
     """Anexa metadados TMDB a cada filme, usando/alimentando o cache local.
 
@@ -122,6 +123,14 @@ def enrich(
     periodicamente, então interromper no meio não perde progresso.
     """
     cache = load_cache(cache_path)
+
+    if refresh:  # força rebuscar títulos casados com o filme errado
+        alvos = [t.lower() for t in refresh]
+        drop = [k for k in cache
+                if any(t in k.rsplit("|", 1)[0].lower() for t in alvos)]
+        for k in drop:
+            del cache[k]
+        print(f"--refresh: {len(drop)} filmes serão rebuscados do zero")
 
     def _pending(r):
         k = f"{r.Name}|{r.Year}"

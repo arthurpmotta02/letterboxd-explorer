@@ -745,7 +745,7 @@ def _build_content(
             and films["tmdb_votes"].notna().any()):
         v = films.dropna(subset=["tmdb_votes"])
         zero = int((v["tmdb_votes"] == 0).sum())
-        rare = v[v["tmdb_votes"] > 0].nsmallest(10, "tmdb_votes")
+        rare = v[v["tmdb_votes"] > 0].nsmallest(20, "tmdb_votes")
         rare = rare[rare["tmdb_votes"] < 200]
         if len(rare) >= 4 and rare["poster"].notna().sum() >= 4:
             sub = "Os registros com menos votos no TMDB em todo o seu histórico"

@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> None:
                     help="Não consulta a API; usa apenas tmdb_cache.json")
     ap.add_argument("--cache", type=Path, default=tmdb.DEFAULT_CACHE,
                     help="Caminho do cache TMDB (padrão: tmdb_cache.json)")
+    ap.add_argument("--refresh", action="append", default=[], metavar="TÍTULO",
+                    help="Força rebuscar filmes cujo nome contém o texto "
+                         "(útil quando a busca casou com o filme errado; "
+                         "pode ser repetido)")
     ap.add_argument("--retry-misses", action="store_true",
                     help="Rebusca no TMDB os filmes que ficaram sem "
                          "correspondência em execuções anteriores")
@@ -47,7 +51,8 @@ def main(argv: list[str] | None = None) -> None:
             print(f"Retrospectiva {args.year}: {len(films)} filmes.")
 
         films = tmdb.enrich(films, args.tmdb_key, args.offline, args.cache,
-                            retry_misses=args.retry_misses)
+                            retry_misses=args.retry_misses,
+                            refresh=args.refresh)
 
         default_name = (f"retrospectiva_{args.year}.html" if args.year
                         else "relatorio_letterboxd.html")

@@ -199,3 +199,19 @@ def test_enrich_retry_misses(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         tmdb.enrich(films, key=None, offline=False, cache_path=cache,
                     retry_misses=True)
+
+
+def test_enrich_refresh_drops_wrong_match(tmp_path):
+    import json
+
+    import pytest
+
+    from letterboxd_explorer import tmdb
+
+    films = pd.DataFrame({"Name": ["Big Guns"], "Year": pd.array([1987], dtype="Int64")})
+    cache = tmp_path / "c.json"
+    cache.write_text(json.dumps({"Big Guns|1987": {"tmdb_id": 999, "poster": None}}))
+    # refresh remove a entrada errada e exige nova busca (logo, chave)
+    with pytest.raises(SystemExit):
+        tmdb.enrich(films, key=None, offline=False, cache_path=cache,
+                    refresh=["big guns"])

@@ -122,6 +122,7 @@ letterboxd-explorer EXPORT [opções]
                    relatório padrão já tem abas por ano)
 --offline          usa só o cache local, sem API
 --retry-misses     rebusca filmes sem correspondência de execuções anteriores
+--refresh TÍTULO   força rebuscar um filme casado com o registro errado
 --cache arquivo    caminho do cache
 --save-figs PASTA  exporta as figuras principais como PNG (pip install kaleido)
 ```
