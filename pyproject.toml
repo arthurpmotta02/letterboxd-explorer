@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "letterboxd-explorer"
+version = "1.0.0"
+description = "Análise exploratória do seu export do Letterboxd em um relatório HTML interativo de arquivo único"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Arthur Motta" }]
+requires-python = ">=3.10"
+keywords = ["letterboxd", "movies", "data-analysis", "tmdb", "plotly"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Video",
+]
+dependencies = [
+    "pandas>=2.0",
+    "plotly>=5.18",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[project.scripts]
+letterboxd-explorer = "letterboxd_explorer.cli:main"
+
+[project.urls]
+Repository = "https://github.com/arthurpmotta02/letterboxd-explorer"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests

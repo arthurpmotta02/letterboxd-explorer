@@ -1,0 +1,10 @@
+# ===== DADOS PESSOAIS: nunca subir para o GitHub =====
+# export do Letterboxd (ZIP baixado e CSVs extraídos)
+*.zip
+watched.csv
+diary.csv
+ratings.csv
+watchlist.csv
+reviews.csv
+profile.csv
+co
