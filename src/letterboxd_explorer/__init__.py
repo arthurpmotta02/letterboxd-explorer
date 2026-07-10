@@ -1,3 +1,3 @@
-"""Letterboxd Explorer — análise exploratória do seu export do Letterboxd."""
+"""Letterboxd Explorer: análise exploratória do seu export do Letterboxd."""
 
-__version__ = "1.8.1"
+__version__ = "1.9.0"

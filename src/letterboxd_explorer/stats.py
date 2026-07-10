@@ -1,4 +1,4 @@
-"""Funções de análise — puras e testáveis, sem I/O nem plotagem."""
+"""Funções de análise: puras e testáveis, sem I/O nem plotagem."""
 
 from __future__ import annotations
 
@@ -170,7 +170,7 @@ def personal_favorites(films: pd.DataFrame, top: int = 10,
 
     Ranquear os 5 estrelas entre si não faz sentido (empate). O que é
     informativo é: dos filmes que você ama, quais o resto do mundo avalia
-    bem abaixo de você — os favoritos que são genuinamente seus.
+    bem abaixo de você: os favoritos que são genuinamente seus.
     """
     rated = films.dropna(subset=["Rating"])
     rated = rated[rated["Rating"] >= min_rating]

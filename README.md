@@ -22,7 +22,54 @@ As seções com pôsteres (favoritos mais pessoais, melhor por gênero, joias es
 
 ## O que o relatório mostra
 
-Mais de 25 visualizações: perfil de gosto (radar), calendário de atividade estilo GitHub, ritmo mensal e curva acumulada, distribuição e evolução das suas notas, hall da fama, você × crítica (com suas maiores "heresias"), décadas, teste de nostalgia, gêneros e microgêneros, sazonalidade dos gêneros (terror em outubro?), suas fases ano a ano, diretores e atores, mapa-múndi dos países de produção, idiomas, duração, filmes-conforto, obscurômetro, indie × blockbuster, e insights automáticos estilo Wrapped (seu dia de cinema, maior maratona, coeficiente cult, saudosismo...). O relatório tem **abas por ano** (Tudo, 2026, 2025...) com tudo recalculado por ano, e seções com **pôsteres via TMDB**: favoritos mais pessoais, melhor avaliado por gênero e joias escondidas (nota alta sua em filmes que pouca gente viu). Curtas-metragens (≤40 min) têm faixa própria nas análises de duração. Há ainda uma **rede bipartida diretor–ator** (as "panelinhas" do seu cinema), resumo executivo automático, navegação rápida por blocos e análises com rigor estatístico: médias bayesianas, desvio-padrão por diretor e linhas de tendência.
+O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), atalhos laterais para cada bloco, resumo executivo automático e botão de voltar ao topo. Tudo interativo (hover, zoom) e em um único arquivo.
+
+### Visão geral
+
+* **Cards de destaque**: total de filmes, horas de tela, nota média, rewatches, recorde anual e tamanho da watchlist.
+* **Resumo executivo**: uma frase automática com seu gênero dominante, diretor mais constante e nota média.
+* **Insights automáticos** (estilo Wrapped): seu dia da semana de cinema, maior maratona de dias seguidos, recorde de filmes em um dia, filme-conforto, defasagem média até assistir, nota mais comum, generosidade vs. TMDB, coeficiente cult (% de filmes pouco votados), saudosismo (pré-1980 vs. pós-2000), contraste entre gêneros ("você avalia Drama 0.8 acima de Ação"), contagem de curtas, resenhas e comentários.
+* **Perfil por gênero**: radar com o volume relativo dos seus 8 gêneros mais vistos.
+
+### Linha do tempo
+
+* **Volume mensal** com média móvel de 3 meses para suavizar picos de maratona.
+* **Calendário de atividade** estilo GitHub (filmes por semana, ano a ano).
+* **Acumulado de visualizações** e **padrão semanal × mensal** (heatmap).
+
+### Suas notas
+
+* **Distribuição das notas** com linha de média.
+* **Evolução da nota média** por ano (você está ficando mais generoso?).
+* **Sua nota × nota TMDB**: scatter com histogramas marginais e cor pela divergência.
+* **Maiores divergências**: barras divergentes (o que você defende e o que não perdoa).
+* **Favoritos mais pessoais**: grade de pôsteres dos seus 4.5/5 estrelas mais distantes da nota TMDB (mínimo de 30 votos, para excluir médias sem lastro).
+* **Melhor avaliado por gênero**: pôster campeão de cada gênero, com selo.
+* **Joias escondidas**: nota alta sua em filmes que pouca gente viu.
+* **Popularidade × avaliação**: scatter em escala log com linha de tendência por faixa.
+
+### O que você assiste
+
+* **Décadas de lançamento** (contagem) e **avaliação por década** (bolhas proporcionais).
+* **Defasagem lançamento → visualização** com curva de densidade.
+* **Lançamento × visualização**: scatter que revela suas fases ("2023 foi meu ano de mergulhar nos anos 70"), colorido pela nota.
+* **Gêneros**: contagem, **boxplot de notas por gênero**, **evolução ano a ano** (área empilhada) e **sazonalidade** (terror em outubro?).
+* **Keywords (microgêneros)** do TMDB: slow burn, neo-noir, coming of age...
+* **Duração**: distribuição com KDE e avaliação por faixa, incluindo curtas (≤40 min).
+* **Orçamento de produção**, **filmes menos conhecidos** (com contagem dos zero-votos) e **rewatches mais frequentes**.
+
+### Watchlist e resenhas
+
+* **Crescimento da watchlist** e **filmes há mais tempo esperando**.
+* **Vocabulário das resenhas**: palavras mais frequentes, sem stopwords.
+
+### Pessoas e lugares
+
+* **Diretores: volume × avaliação × consistência**: scatter com barras de desvio-padrão (consistente vs. ama-ou-odeia) e cor pela média bayesiana, que desconta amostras pequenas.
+* **Atores e atrizes mais frequentes**.
+* **Rede de colaborações diretor–ator**: diagrama bipartido das parcerias com 2+ filmes.
+* **Mapa-múndi dos países de produção** em escala logarítmica (cobertura ISO completa).
+* **Idiomas originais** com nomes legíveis.
 
 ## Instalação
 

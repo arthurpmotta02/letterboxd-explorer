@@ -566,7 +566,7 @@ def _build_content(
             fig.update_layout(showlegend=False)
             add(G, "Popularidade × avaliação",
                 "Cada ponto é um filme; a linha clara é a nota média por faixa "
-                "de popularidade — ela sobe ou desce com a fama?", fig, 460)
+                "de popularidade. Ela sobe ou desce com a fama?", fig, 460)
 
     # ================================================== o que você assiste
     G = "O que você assiste"
@@ -843,7 +843,7 @@ def _build_content(
             fig.update_layout(margin=dict(l=8, r=8, t=8, b=8))
             top5 = ", ".join(f"{i} ({v})" for i, v in c.head(5).items())
             add(G, "Países de produção",
-                f"Escala logarítmica — top: {top5}", fig, 520)
+                f"Escala logarítmica · top: {top5}", fig, 520)
 
     if "language" in films:
         lang = films["language"].dropna().value_counts()
@@ -919,7 +919,7 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
     n_enriched = films["tmdb_id"].notna().sum() if "tmdb_id" in films else 0
     period = ""
     if diary is not None and len(diary):
-        period = (f'{diary["Watched Date"].min():%d/%m/%Y} — '
+        period = (f'{diary["Watched Date"].min():%d/%m/%Y} a '
                   f'{diary["Watched Date"].max():%d/%m/%Y}')
     title = f"Retrospectiva {year}" if year else "Letterboxd Explorer"
 
@@ -1004,6 +1004,14 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
                margin: 20px 0 4px; }}
   .quicknav a {{ color:{BLUE}; text-decoration:none; }}
   .quicknav a:hover {{ text-decoration:underline; }}
+  #sidenav {{ position:fixed; left:18px; top:50%; transform:translateY(-50%);
+              z-index:15; display:none; flex-direction:column; gap:6px;
+              max-width:180px; }}
+  @media (min-width: 1400px) {{ #sidenav {{ display:flex; }} }}
+  #sidenav a {{ background:{CARD}; color:{MUTED}; border:1px solid #2c3440;
+                border-radius:10px; padding:7px 12px; font-size:.8rem;
+                text-decoration:none; transition:.15s; }}
+  #sidenav a:hover {{ color:{TEXT}; border-color:{GREEN}; }}
   #totop {{ position:fixed; right:22px; bottom:22px; z-index:20;
             background:{CARD}; color:{TEXT}; border:1px solid #2c3440;
             border-radius:50%; width:44px; height:44px; font-size:1.2rem;
@@ -1025,12 +1033,31 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
     Explorer</a> · dados de filmes por <a href="https://www.themoviedb.org">TMDB</a>
     (este produto usa a API do TMDB mas não é endossado ou certificado pelo TMDB).</footer>
 </div>
+<nav id="sidenav" aria-label="atalhos"></nav>
 <button id="totop" title="voltar ao topo"
   onclick="window.scrollTo({{top:0, behavior:'smooth'}})">↑</button>
 <script>
 window.addEventListener('scroll', function () {{
   document.getElementById('totop').classList.toggle('show', window.scrollY > 600);
 }});
+function buildSideNav(i) {{
+  var nav = document.getElementById('sidenav');
+  nav.innerHTML = '';
+  var top = document.createElement('a');
+  top.textContent = '↑ topo';
+  top.href = '#';
+  top.onclick = function (e) {{
+    e.preventDefault();
+    window.scrollTo({{top: 0, behavior: 'smooth'}});
+  }};
+  nav.appendChild(top);
+  document.querySelectorAll('#tab-' + i + ' .group').forEach(function (g) {{
+    var a = document.createElement('a');
+    a.textContent = g.querySelector('span').textContent;
+    a.href = '#' + g.id;
+    nav.appendChild(a);
+  }});
+}}
 function showTab(i) {{
   document.querySelectorAll('.tabpane').forEach(function (el, j) {{
     el.style.display = (i === j) ? '' : 'none';
@@ -1038,6 +1065,7 @@ function showTab(i) {{
   document.querySelectorAll('.tabs button').forEach(function (b, j) {{
     b.classList.toggle('active', i === j);
   }});
+  buildSideNav(i);
   window.dispatchEvent(new Event('resize'));
 }}
 showTab(0);
