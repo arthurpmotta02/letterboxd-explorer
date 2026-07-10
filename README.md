@@ -98,4 +98,107 @@ Você não precisa saber usar git:
 
 ### 4.4. Crie sua chave gratuita do TMDB
 
-1. Crie uma conta em [themoviedb.org/signup](https://www.themoviedb.org/signup
+1. Crie uma conta em [themoviedb.org/signup](https://www.themoviedb.org/signup) e confirme o e-mail.
+2. Vá em **Settings**, menu **API**, e clique em **Create** (uso pessoal/developer). Preencha o formulário simples.
+3. Copie o código chamado **API Key**. Tanto a API Key (v3) quanto o Read Access Token (v4) funcionam aqui.
+
+### 4.5. Instale e rode
+
+Abra o terminal **dentro da pasta do projeto**:
+
+* Windows: abra a pasta no Explorer, clique na barra de endereço, digite `powershell` e aperte Enter.
+* macOS: clique com o botão direito na pasta e escolha "New Terminal at Folder" (ou use o app Terminal e digite `cd ` seguido do caminho da pasta).
+
+Então rode, uma linha por vez:
+
+```bash
+pip install .
+letterboxd-explorer letterboxd-seuusuario-2026-07-10.zip --tmdb-key SUA_CHAVE_AQUI
+```
+
+Troque o nome do ZIP pelo nome real do seu arquivo e `SUA_CHAVE_AQUI` pela chave do TMDB. A primeira execução consulta o TMDB e leva de 1 a 3 minutos por 1000 filmes; tudo fica guardado em `tmdb_cache.json`, então as próximas execuções são instantâneas.
+
+Ao final, abra o arquivo **`relatorio_letterboxd.html`** com dois cliques. Pronto.
+
+Se `pip` ou `letterboxd-explorer` não forem reconhecidos no Windows, use `py -m pip install .` e `py -m letterboxd_explorer export.zip --tmdb-key SUA_CHAVE`.
+
+## 5. Opções avançadas
+
+### Modo retrospectiva ("Wrapped")
+
+Gera um relatório só com o que você assistiu em um ano:
+
+```bash
+letterboxd-explorer export.zip --year 2025
+```
+
+Sai como `retrospectiva_2025.html`.
+
+### Todas as opções
+
+```
+letterboxd-explorer EXPORT [opções]
+
+EXPORT               ZIP do export ou pasta com os CSVs extraídos
+--tmdb-key CHAVE     chave da API do TMDB (ou defina a variável de ambiente TMDB_API_KEY)
+--year 2025          modo retrospectiva de um ano
+-o saida.html        nome do arquivo de saída
+--offline            não consulta a API, usa apenas o cache local
+--cache arquivo      caminho do cache (padrão: tmdb_cache.json)
+```
+
+### Demo sem chave de API
+
+Para ver o relatório funcionando com dados fictícios, sem export nem chave:
+
+```bash
+python scripts/make_sample_data.py
+letterboxd-explorer sample-export --offline -o demo.html
+```
+
+## 6. Privacidade dos seus dados
+
+Seu export do Letterboxd contém seu histórico pessoal e **não deve ser publicado**. O `.gitignore` deste repositório já bloqueia os arquivos sensíveis de irem para o GitHub por acidente:
+
+* qualquer `*.zip` (o export baixado);
+* os CSVs do export (`watched.csv`, `diary.csv`, `ratings.csv` etc.);
+* `tmdb_cache.json` (contém a lista de tudo que você assistiu);
+* os relatórios `*.html` gerados;
+* arquivos `.env` (caso você guarde a chave do TMDB neste formato).
+
+A chave do TMDB também é pessoal: passe pela linha de comando ou pela variável de ambiente `TMDB_API_KEY`, nunca a escreva em arquivos versionados.
+
+## 7. Desenvolvimento
+
+```bash
+pip install -e ".[dev]"
+ruff check src tests
+pytest
+```
+
+São 21 testes cobrindo leitura do export (ZIP e pasta), estatísticas, modo retrospectiva e geração do HTML. O CI (GitHub Actions) roda lint e testes em Python 3.10 e 3.12 a cada push. Os testes não dependem de dados reais nem de chave de API: as fixtures criam exports em miniatura.
+
+## 8. Decisões técnicas
+
+**Relatório como arquivo HTML único.** O objetivo é um artefato que qualquer pessoa abre e compartilha sem instalar nada. Por isso o template é gerado direto em Python com os gráficos Plotly embutidos, e a única dependência externa é o plotly.js via CDN, o que mantém o arquivo leve (menos de 1 MB mesmo com milhares de filmes).
+
+**Cache incremental do TMDB.** Cada filme consultado vai para `tmdb_cache.json`, salvo a cada 25 requisições. Se a execução cair no meio, nada se perde; rodadas seguintes só buscam o que falta. O cliente respeita o rate limit da API (espera e re-tenta em respostas 429) e aceita tanto a chave v3 quanto o token v4.
+
+**Análises separadas da renderização.** `stats.py` só recebe e devolve DataFrames, sem tocar em rede, disco ou gráficos. Isso é o que permite testar as análises isoladamente e trocar de front-end (notebook, dashboard, PDF) sem reescrever a lógica.
+
+**Busca por título e ano com fallback.** O ano do Letterboxd às vezes diverge do TMDB (ano de festival vs. lançamento comercial). A busca tenta primeiro com o ano e, se não encontrar, repete sem ele. Filmes não encontrados não quebram o relatório: apenas ficam de fora das análises enriquecidas.
+
+## 9. Roadmap
+
+* Comparação entre dois exports (você contra um amigo)
+* Análise de sentimento das reviews (`reviews.csv`)
+* Pôsteres dos filmes nos destaques (TMDB images)
+* Versão em inglês do relatório
+
+## 10. Licença e créditos
+
+MIT. Dados de filmes fornecidos pelo [TMDB](https://www.themoviedb.org); este produto usa a API do TMDB mas não é endossado ou certificado pelo TMDB. Projeto independente, sem afiliação com o Letterboxd.
+
+---
+
+*Projeto de portfólio. O relatório roda 100% na sua máquina: nenhum dado seu é enviado a lugar algum além das consultas de metadados de filmes à API do TMDB.*
