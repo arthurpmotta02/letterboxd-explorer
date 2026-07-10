@@ -7,4 +7,37 @@ ratings.csv
 watchlist.csv
 reviews.csv
 profile.csv
-co
+comments.csv
+likes/
+lists/
+letterboxd-*/
+
+# cache do TMDB (contém a lista de tudo que você assistiu)
+tmdb_cache.json
+
+# relatórios gerados
+*.html
+
+# chaves e segredos
+.env
+.env.*
+
+# dados de demonstração gerados localmente
+sample-export/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# ===== Sistema operacional / editor =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -66,3 +66,45 @@ def test_watch_gap(films, diary):
     g = stats.watch_gap(films, diary)
     assert (g >= 0).all()
     assert g.max() == 2024 - 1994
+
+
+def test_weekly_calendar(diary):
+    cal = stats.weekly_calendar(diary)
+    assert cal.values.sum() == len(diary)
+    assert list(cal.columns) == list(range(1, 54))
+
+
+def test_cumulative_films(diary):
+    c = stats.cumulative_films(diary)
+    assert c.iloc[-1] == len(diary)
+    assert c.is_monotonic_increasing
+
+
+def test_rating_by_decade(films):
+    rd = stats.rating_by_decade(films, min_count=1)
+    assert rd.loc[1990, "mean"] == 5.0
+    assert rd.loc[2010, "count"] == 1  # só "D" tem nota em 2010
+
+
+def test_rating_by_runtime(films):
+    rr = stats.rating_by_runtime(films, min_count=1)
+    assert rr["count"].sum() == 3  # A, B, D têm nota e duração
+
+
+def test_hall_of_fame(films):
+    hof = stats.hall_of_fame(films, top=2)
+    assert list(hof["Name"]) == ["A", "D"]  # 5.0 depois 4.0
+
+
+def test_budget_buckets_empty(films):
+    assert stats.budget_buckets(films).empty  # fixture sem coluna budget
+
+
+def test_hipster_and_nostalgia_none_on_small(films):
+    assert stats.hipster_index(films) is None  # menos de 20 filmes
+    assert stats.nostalgia_gap(films) is None  # menos de 5 por grupo
+
+
+def test_genre_month(films, diary):
+    gm = stats.genre_month(diary, films)
+    assert (gm.sum(axis=1).round(6) == 1).all()
