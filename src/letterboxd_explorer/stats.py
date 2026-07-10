@@ -156,8 +156,9 @@ def rating_by_runtime(films: pd.DataFrame, min_count: int = 5) -> pd.DataFrame:
     rated = rated[rated["runtime"] > 0]
     if rated.empty:
         return pd.DataFrame(columns=["mean", "count"])
-    bins = [0, 90, 120, 150, 180, float("inf")]
-    labels = ["até 90 min", "90 a 120", "120 a 150", "150 a 180", "mais de 180"]
+    bins = [0, 40, 90, 120, 150, 180, float("inf")]
+    labels = ["curta (≤40 min)", "40 a 90", "90 a 120", "120 a 150",
+              "150 a 180", "mais de 180"]
     faixa = pd.cut(rated["runtime"], bins=bins, labels=labels)
     g = rated.groupby(faixa, observed=False)["Rating"].agg(["mean", "count"])
     return g[g["count"] >= min_count]
@@ -287,3 +288,84 @@ def watchlist_oldest(watchlist: pd.DataFrame, today=None, top: int = 10) -> pd.D
     w = watchlist.dropna(subset=["AddedDate"]).copy()
     w["dias"] = (today - w["AddedDate"]).dt.days
     return w.nlargest(top, "dias")[["Name", "Year", "dias"]]
+
+
+def bayesian_rating(g: pd.DataFrame, prior_mean: float, m: int = 5) -> pd.Series:
+    """Média bayesiana: encolhe médias de amostras pequenas para a média global.
+
+    score = (n * média + m * média_global) / (n + m)
+    """
+    return (g["count"] * g["mean"] + m * prior_mean) / (g["count"] + m)
+
+
+def director_stats_full(films: pd.DataFrame, min_count: int = 3,
+                        top: int = 25) -> pd.DataFrame:
+    """Por diretor: n, nota média, desvio-padrão e média bayesiana."""
+    if "directors" not in films:
+        return pd.DataFrame(columns=["n", "nota", "std", "bayes"])
+    ds = films.explode("directors").dropna(subset=["directors"])
+    rated = ds.dropna(subset=["Rating"])
+    if rated.empty:
+        return pd.DataFrame(columns=["n", "nota", "std", "bayes"])
+    agg = rated.groupby("directors")["Rating"].agg(
+        n="count", nota="mean", std="std")
+    agg["std"] = agg["std"].fillna(0)
+    prior = rated["Rating"].mean()
+    agg["bayes"] = (agg["n"] * agg["nota"] + 5 * prior) / (agg["n"] + 5)
+    return agg[agg["n"] >= min_count].nlargest(top, "n")
+
+
+def release_vs_watch(films: pd.DataFrame, diary: pd.DataFrame) -> pd.DataFrame:
+    """Ano de lançamento × ano em que você assistiu, com nota quando houver."""
+    d = diary.dropna(subset=["Year"]).copy()
+    d["watch_year"] = d["Watched Date"].dt.year
+    d["release_year"] = d["Year"].astype(int)
+    d = d[d["watch_year"] >= d["release_year"]]
+    if d["Rating"].isna().all():
+        d = d.drop(columns=["Rating"]).merge(
+            films[["Name", "Year", "Rating"]], on=["Name", "Year"], how="left")
+    return d[["Name", "release_year", "watch_year", "Rating"]]
+
+
+def genre_rating_contrast(films: pd.DataFrame, min_count: int = 10):
+    """(gênero_top, gênero_bottom, diferença) por nota média bayesiana."""
+    g = group_rating(films, "genres", min_count=min_count)
+    if len(g) < 2:
+        return None
+    rated = films.dropna(subset=["Rating"])
+    bayes = bayesian_rating(g, prior_mean=rated["Rating"].mean())
+    hi, lo = bayes.idxmax(), bayes.idxmin()
+    return hi, lo, float(g.loc[hi, "mean"] - g.loc[lo, "mean"])
+
+
+def binned_trend(x: pd.Series, y: pd.Series, bins: int = 8):
+    """Tendência por quantis de x (robusta, sem dependência extra): médias por faixa."""
+    df = pd.DataFrame({"x": x, "y": y}).dropna()
+    if len(df) < bins * 4:
+        return None
+    df["bin"] = pd.qcut(df["x"], q=bins, duplicates="drop")
+    g = df.groupby("bin", observed=True).agg(x=("x", "median"), y=("y", "mean"))
+    return g["x"].values, g["y"].values
+
+
+def collaboration_edges(films: pd.DataFrame, min_films: int = 2,
+                        top_directors: int = 12, top_actors: int = 18) -> pd.Series:
+    """Parcerias diretor–ator no seu histórico: (diretor, ator) -> nº de filmes.
+
+    Filtrado para ficar legível: só parcerias com `min_films`+ filmes, entre os
+    diretores e atores mais recorrentes nessas parcerias.
+    """
+    if "directors" not in films or "cast" not in films:
+        return pd.Series(dtype=int)
+    e = films[["Name", "directors", "cast"]].dropna(subset=["directors", "cast"])
+    e = e.explode("directors").explode("cast").dropna()
+    if e.empty:
+        return pd.Series(dtype=int)
+    pairs = e.groupby(["directors", "cast"]).size()
+    pairs = pairs[pairs >= min_films]
+    if pairs.empty:
+        return pairs
+    keep_d = pairs.groupby(level=0).sum().nlargest(top_directors).index
+    pairs = pairs[pairs.index.get_level_values(0).isin(keep_d)]
+    keep_a = pairs.groupby(level=1).sum().nlargest(top_actors).index
+    return pairs[pairs.index.get_level_values(1).isin(keep_a)]

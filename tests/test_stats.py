@@ -144,3 +144,39 @@ def test_watchlist_oldest_and_growth():
     assert old.iloc[0]["Name"] == "X" and old.iloc[0]["dias"] == 1461
     g = stats.watchlist_growth(wl)
     assert g.iloc[-1] == 2
+
+
+def test_bayesian_shrinks_small_samples():
+    g = pd.DataFrame({"mean": [5.0, 4.0], "count": [1, 40]}, index=["novato", "veterano"])
+    b = stats.bayesian_rating(g, prior_mean=3.0, m=5)
+    # 1 filme 5★ encolhe muito para o prior; 40 filmes 4★ quase não se movem
+    assert b["novato"] < 3.5 and b["veterano"] > 3.85
+
+
+def test_director_stats_full(films):
+    ds = stats.director_stats_full(films, min_count=2)
+    assert ds.loc["X", "n"] == 3 and ds.loc["X", "std"] > 0
+    # fórmula: (n*nota + 5*prior)/(n+5); aqui prior == nota de X (só X tem notas)
+    n, nota = ds.loc["X", "n"], ds.loc["X", "nota"]
+    assert abs(ds.loc["X", "bayes"] - (n * nota + 5 * nota) / (n + 5)) < 1e-9
+
+
+def test_release_vs_watch(films, diary):
+    rv = stats.release_vs_watch(films, diary)
+    assert (rv["watch_year"] >= rv["release_year"]).all()
+
+
+def test_genre_rating_contrast(films):
+    out = stats.genre_rating_contrast(films, min_count=1)
+    assert out is not None and out[2] >= 0
+
+
+def test_collaboration_edges():
+    films = pd.DataFrame({
+        "Name": ["f1", "f2", "f3", "f4"],
+        "directors": [["Fassbinder"], ["Fassbinder"], ["Fassbinder"], ["Outro"]],
+        "cast": [["Schygulla", "X"], ["Schygulla"], ["Y"], ["Z"]],
+    })
+    pairs = stats.collaboration_edges(films, min_films=2)
+    assert pairs.loc[("Fassbinder", "Schygulla")] == 2
+    assert ("Outro", "Z") not in pairs.index  # só 1 filme juntos

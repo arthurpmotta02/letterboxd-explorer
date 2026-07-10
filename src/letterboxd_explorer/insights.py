@@ -59,7 +59,7 @@ def generate(films: pd.DataFrame, diary: pd.DataFrame | None,
     hip = stats.hipster_index(films)
     if hip is not None and hip >= 0.15:
         out.append(
-            f"Índice hipster: <b>{hip:.0%}</b> dos seus filmes têm menos de "
+            f"Coeficiente cult: <b>{hip:.0%}</b> dos seus filmes têm menos de "
             "1000 votos no TMDB."
         )
 
@@ -67,14 +67,22 @@ def generate(films: pd.DataFrame, diary: pd.DataFrame | None,
     if ng is not None and abs(ng) >= 0.2:
         if ng > 0:
             out.append(
-                f"Viés de nostalgia: você dá <b>+{ng:.1f}★</b> em média "
-                "para filmes pré-1980 em relação aos pós-2000."
+                f"Saudosismo: você avalia filmes pré-1980 <b>+{ng:.1f}★</b> "
+                "acima dos pós-2000. Antigamente era melhor?"
             )
         else:
             out.append(
-                f"Nada de saudosismo: você dá <b>{-ng:.1f}★ a mais</b> "
+                f"Zero saudosismo: você dá <b>{-ng:.1f}★ a mais</b> "
                 "para filmes pós-2000 do que para os pré-1980."
             )
+
+    contrast = stats.genre_rating_contrast(films)
+    if contrast and contrast[2] >= 0.3:
+        hi, lo, d = contrast
+        out.append(
+            f"Você avalia <b>{hi}</b> {d:.1f}★ acima de <b>{lo}</b> "
+            "(mín. 10 filmes por gênero)."
+        )
 
     dec = stats.decade_counts(films)
     if len(dec):
@@ -102,6 +110,9 @@ def generate(films: pd.DataFrame, diary: pd.DataFrame | None,
             out.append(f"Você deixou <b>{len(comments)} comentários</b> por aí.")
 
     if "runtime" in films and films["runtime"].notna().any():
+        curtas = int((films["runtime"].dropna() <= 40).sum())
+        if curtas >= 10:
+            out.append(f"Você já viu <b>{curtas} curtas-metragens</b> (≤40 min).")
         hours = films["runtime"].dropna().sum() / 60
         if hours >= 24:
             out.append(

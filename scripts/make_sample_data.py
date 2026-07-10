@@ -39,6 +39,7 @@ for i in range(320):
     films.append((name, year))
     cache[f"{name}|{year}"] = {
         "tmdb_id": 10000 + i,
+        "poster": None,
         "genres": random.sample(GENRES, k=random.randint(1, 3)),
         "keywords": random.sample(KEYWORDS, k=random.randint(2, 6)),
         "countries": random.sample(COUNTRIES, k=random.randint(1, 2)),

@@ -56,22 +56,49 @@ pio.templates["lb"] = go.layout.Template(
 pio.templates.default = "lb"
 
 ISO2_TO_ISO3 = {
-    "US": "USA", "GB": "GBR", "FR": "FRA", "DE": "DEU", "IT": "ITA", "ES": "ESP",
-    "BR": "BRA", "JP": "JPN", "KR": "KOR", "CN": "CHN", "HK": "HKG", "TW": "TWN",
-    "IN": "IND", "MX": "MEX", "AR": "ARG", "CL": "CHL", "CO": "COL", "PE": "PER",
-    "UY": "URY", "PT": "PRT", "CA": "CAN", "AU": "AUS", "NZ": "NZL", "IE": "IRL",
-    "SE": "SWE", "NO": "NOR", "DK": "DNK", "FI": "FIN", "IS": "ISL", "NL": "NLD",
-    "BE": "BEL", "CH": "CHE", "AT": "AUT", "PL": "POL", "CZ": "CZE", "SK": "SVK",
-    "HU": "HUN", "RO": "ROU", "BG": "BGR", "GR": "GRC", "TR": "TUR", "RU": "RUS",
-    "UA": "UKR", "IL": "ISR", "IR": "IRN", "IQ": "IRQ", "SA": "SAU", "AE": "ARE",
-    "EG": "EGY", "MA": "MAR", "DZ": "DZA", "TN": "TUN", "ZA": "ZAF", "NG": "NGA",
-    "KE": "KEN", "ET": "ETH", "SN": "SEN", "TH": "THA", "VN": "VNM", "PH": "PHL",
-    "ID": "IDN", "MY": "MYS", "SG": "SGP", "PK": "PAK", "BD": "BGD", "LK": "LKA",
-    "NP": "NPL", "KZ": "KAZ", "GE": "GEO", "AM": "ARM", "RS": "SRB", "HR": "HRV",
-    "SI": "SVN", "BA": "BIH", "MK": "MKD", "AL": "ALB", "EE": "EST", "LV": "LVA",
-    "LT": "LTU", "BY": "BLR", "MD": "MDA", "CU": "CUB", "DO": "DOM", "GT": "GTM",
-    "CR": "CRI", "PA": "PAN", "VE": "VEN", "BO": "BOL", "PY": "PRY", "EC": "ECU",
-    "SU": "RUS", "XC": "CZE", "CS": "SRB", "YU": "SRB", "DD": "DEU",
+    # África
+    "DZ": "DZA", "AO": "AGO", "BJ": "BEN", "BW": "BWA", "BF": "BFA", "BI": "BDI",
+    "CV": "CPV", "CM": "CMR", "CF": "CAF", "TD": "TCD", "KM": "COM", "CG": "COG",
+    "CD": "COD", "CI": "CIV", "DJ": "DJI", "EG": "EGY", "GQ": "GNQ", "ER": "ERI",
+    "SZ": "SWZ", "ET": "ETH", "GA": "GAB", "GM": "GMB", "GH": "GHA", "GN": "GIN",
+    "GW": "GNB", "KE": "KEN", "LS": "LSO", "LR": "LBR", "LY": "LBY", "MG": "MDG",
+    "MW": "MWI", "ML": "MLI", "MR": "MRT", "MU": "MUS", "MA": "MAR", "MZ": "MOZ",
+    "NA": "NAM", "NE": "NER", "NG": "NGA", "RW": "RWA", "ST": "STP", "SN": "SEN",
+    "SC": "SYC", "SL": "SLE", "SO": "SOM", "ZA": "ZAF", "SS": "SSD", "SD": "SDN",
+    "TZ": "TZA", "TG": "TGO", "TN": "TUN", "UG": "UGA", "ZM": "ZMB", "ZW": "ZWE",
+    # Américas
+    "AG": "ATG", "BS": "BHS", "BB": "BRB", "BZ": "BLZ", "CA": "CAN", "CR": "CRI",
+    "CU": "CUB", "DM": "DMA", "DO": "DOM", "SV": "SLV", "GD": "GRD", "GT": "GTM",
+    "HT": "HTI", "HN": "HND", "JM": "JAM", "MX": "MEX", "NI": "NIC", "PA": "PAN",
+    "KN": "KNA", "LC": "LCA", "VC": "VCT", "TT": "TTO", "US": "USA", "PR": "PRI",
+    "AR": "ARG", "BO": "BOL", "BR": "BRA", "CL": "CHL", "CO": "COL", "EC": "ECU",
+    "GY": "GUY", "PY": "PRY", "PE": "PER", "SR": "SUR", "UY": "URY", "VE": "VEN",
+    "GL": "GRL",
+    # Ásia e Oriente Médio
+    "AF": "AFG", "AM": "ARM", "AZ": "AZE", "BH": "BHR", "BD": "BGD", "BT": "BTN",
+    "BN": "BRN", "KH": "KHM", "CN": "CHN", "CY": "CYP", "GE": "GEO", "IN": "IND",
+    "ID": "IDN", "IR": "IRN", "IQ": "IRQ", "IL": "ISR", "JP": "JPN", "JO": "JOR",
+    "KZ": "KAZ", "KW": "KWT", "KG": "KGZ", "LA": "LAO", "LB": "LBN", "MY": "MYS",
+    "MV": "MDV", "MN": "MNG", "MM": "MMR", "NP": "NPL", "KP": "PRK", "OM": "OMN",
+    "PK": "PAK", "PS": "PSE", "PH": "PHL", "QA": "QAT", "SA": "SAU", "SG": "SGP",
+    "KR": "KOR", "LK": "LKA", "SY": "SYR", "TW": "TWN", "TJ": "TJK", "TH": "THA",
+    "TL": "TLS", "TR": "TUR", "TM": "TKM", "AE": "ARE", "UZ": "UZB", "VN": "VNM",
+    "YE": "YEM", "HK": "HKG", "MO": "MAC",
+    # Europa
+    "AL": "ALB", "AD": "AND", "AT": "AUT", "BY": "BLR", "BE": "BEL", "BA": "BIH",
+    "BG": "BGR", "HR": "HRV", "CZ": "CZE", "DK": "DNK", "EE": "EST", "FI": "FIN",
+    "FR": "FRA", "DE": "DEU", "GR": "GRC", "HU": "HUN", "IS": "ISL", "IE": "IRL",
+    "IT": "ITA", "LV": "LVA", "LI": "LIE", "LT": "LTU", "LU": "LUX", "MT": "MLT",
+    "MD": "MDA", "MC": "MCO", "ME": "MNE", "NL": "NLD", "MK": "MKD", "NO": "NOR",
+    "PL": "POL", "PT": "PRT", "RO": "ROU", "RU": "RUS", "SM": "SMR", "RS": "SRB",
+    "SK": "SVK", "SI": "SVN", "ES": "ESP", "SE": "SWE", "CH": "CHE", "UA": "UKR",
+    "GB": "GBR",
+    # Oceania
+    "AU": "AUS", "FJ": "FJI", "KI": "KIR", "MH": "MHL", "FM": "FSM", "NR": "NRU",
+    "NZ": "NZL", "PW": "PLW", "PG": "PNG", "WS": "WSM", "SB": "SLB", "TO": "TON",
+    "TV": "TUV", "VU": "VUT",
+    # códigos históricos usados pelo TMDB
+    "SU": "RUS", "XC": "CZE", "CS": "SRB", "YU": "SRB", "DD": "DEU", "XG": "DEU",
 }
 
 
@@ -110,6 +137,42 @@ def _kde(values, n_hist_bins=40):
     return xs, dens * len(v) * binw
 
 
+SAVE_FIGS = {
+    "Perfil por gênero": "perfil_por_genero",
+    "Volume mensal": "volume_mensal",
+    "Calendário de atividade": "calendario_atividade",
+    "Padrão semanal e mensal": "padrao_semanal",
+    "Distribuição das notas": "distribuicao_notas",
+    "Sua nota × nota TMDB": "voce_vs_tmdb",
+    "Maiores divergências vs. TMDB": "maiores_divergencias",
+    "Lançamento × visualização": "lancamento_x_visualizacao",
+    "Popularidade × avaliação": "popularidade_x_avaliacao",
+    "Distribuição das notas por gênero": "boxplot_generos",
+    "Evolução dos gêneros": "evolucao_generos",
+    "Sazonalidade dos gêneros": "sazonalidade_generos",
+    "Keywords (microgêneros)": "keywords_microgeneros",
+    "Diretores: volume × avaliação × consistência": "diretores_volume_avaliacao",
+    "Rede de colaborações diretor–ator": "rede_colaboracoes",
+    "Países de produção": "mapa_paises",
+}
+
+POSTER_BASE = "https://image.tmdb.org/t/p/w185"
+
+
+def _poster_grid(items) -> str:
+    """Grade de pôsteres (HTML puro). items: dicts com name/year/poster/lines/badge."""
+    cells = ""
+    for it in items:
+        img = (f'<img src="{POSTER_BASE}{it["poster"]}" alt="" loading="lazy">'
+               if it.get("poster") else '<div class="noposter">🎬</div>')
+        badge = f'<span class="badge">{it["badge"]}</span>' if it.get("badge") else ""
+        meta = "".join(f'<div class="pmeta">{ln}</div>' for ln in it.get("lines", []))
+        cells += (f'<figure class="pcell">{badge}{img}<figcaption>'
+                  f'<div class="pname">{it["name"]} ({it["year"]})</div>{meta}'
+                  "</figcaption></figure>")
+    return f'<div class="postergrid">{cells}</div>'
+
+
 def _hist_kde(values, color, xlabel):
     fig = px.histogram(values, nbins=40, labels={"value": xlabel})
     fig.update_traces(marker=dict(color=color, opacity=.75, line_width=0))
@@ -119,6 +182,43 @@ def _hist_kde(values, color, xlabel):
         fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", name="densidade",
                                  line=dict(color=TEXT, width=2, shape="spline")))
     fig.update_layout(showlegend=False, yaxis_title="filmes")
+    return fig
+
+
+def _network_fig(pairs: pd.Series):
+    """Diagrama bipartido diretor–ator: espessura = filmes juntos."""
+    directors = pairs.groupby(level=0).sum().sort_values(ascending=False)
+    actors = pairs.groupby(level=1).sum().sort_values(ascending=False)
+    yd = {d: i / max(len(directors) - 1, 1) for i, d in enumerate(directors.index)}
+    ya = {a: i / max(len(actors) - 1, 1) for i, a in enumerate(actors.index)}
+    fig = go.Figure()
+    for (d, a), w in pairs.items():
+        fig.add_trace(go.Scatter(
+            x=[0, 1], y=[yd[d], ya[a]], mode="lines",
+            line=dict(width=1 + w * 1.4, color="rgba(0,224,84,.28)"),
+            hoverinfo="skip", showlegend=False))
+    fig.add_trace(go.Scatter(
+        x=[0] * len(directors), y=[yd[d] for d in directors.index],
+        mode="markers+text", text=list(directors.index),
+        textposition="middle left", textfont=dict(size=11.5, color=TEXT),
+        marker=dict(size=directors.values / directors.max() * 18 + 9,
+                    color=ORANGE, line=dict(width=1.5, color=CARD)),
+        customdata=directors.values,
+        hovertemplate="%{text}: %{customdata} colaborações<extra></extra>",
+        showlegend=False))
+    fig.add_trace(go.Scatter(
+        x=[1] * len(actors), y=[ya[a] for a in actors.index],
+        mode="markers+text", text=list(actors.index),
+        textposition="middle right", textfont=dict(size=11.5, color=TEXT),
+        marker=dict(size=actors.values / actors.max() * 18 + 9,
+                    color=BLUE, line=dict(width=1.5, color=CARD)),
+        customdata=actors.values,
+        hovertemplate="%{text}: %{customdata} colaborações<extra></extra>",
+        showlegend=False))
+    fig.update_layout(
+        xaxis=dict(visible=False, range=[-0.75, 1.75]),
+        yaxis=dict(visible=False, range=[-0.08, 1.08]),
+        margin=dict(l=10, r=10, t=20, b=20))
     return fig
 
 
@@ -159,14 +259,17 @@ def build_report(
     frames: dict,
     out: Path,
     year: int | None = None,
+    save_figs: Path | None = None,
 ) -> Path:
     """Monta o relatório. Sem `year`, gera abas: Tudo + um ano por aba."""
     diary, date_note = _activity(diary, frames)
 
+    registry: dict = {}
     tabs: list[tuple[str, list, list, list]] = []
     label = f"Retrospectiva {year}" if year else "Tudo"
     cards, facts, sections = _build_content(films, diary, frames,
-                                            main=year is None, note=date_note)
+                                            main=year is None, note=date_note,
+                                            registry=registry)
     tabs.append((label, cards, facts, sections))
 
     if year is None and diary is not None and len(diary):
@@ -184,7 +287,23 @@ def build_report(
                 tabs.append((str(y), c, fa, se))
 
     _write_html(tabs, films, diary, frames, out, year)
+    if save_figs:
+        _export_figs(registry, Path(save_figs))
     return out
+
+
+def _export_figs(registry: dict, folder: Path) -> None:
+    """Exporta as figuras principais como PNG (requer o pacote kaleido)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        for name, (fig, height) in registry.items():
+            fig.write_image(str(folder / f"{name}.png"),
+                            width=1000, height=height, scale=2)
+        print(f"✔ {len(registry)} figuras salvas em {folder.resolve()}")
+    except Exception as e:
+        print("! Não foi possível exportar PNGs. Instale: pip install kaleido "
+              "(requer Google Chrome) ou, sem Chrome: "
+              f"pip install kaleido==0.2.1  ({e})")
 
 
 def _build_content(
@@ -193,11 +312,17 @@ def _build_content(
     frames: dict,
     main: bool = True,
     note: str = "",
+    registry: dict | None = None,
 ):
     sections: list[tuple[str, str, str, str]] = []
 
     def add(grp, title, sub, fig, height=420):
+        if registry is not None and title in SAVE_FIGS:
+            registry[SAVE_FIGS[title]] = (fig, height)
         sections.append((grp, title, sub, _fig_html(fig, height)))
+
+    def add_html(grp, title, sub, html):
+        sections.append((grp, title, sub, html))
 
     rated = films.dropna(subset=["Rating"])
     hours = films["runtime"].dropna().sum() / 60 if "runtime" in films else 0
@@ -246,12 +371,22 @@ def _build_content(
         if len(diary) >= 10:
             m = diary.set_index("Watched Date").resample("ME").size()
             fig = go.Figure(go.Scatter(
-                x=m.index, y=m.values, mode="lines",
-                line=dict(color=GREEN, width=2.5, shape="spline", smoothing=.6),
-                fill="tozeroy", fillcolor="rgba(0,224,84,.12)",
+                x=m.index, y=m.values, mode="lines", name="mensal",
+                line=dict(color=GREEN, width=1.5, shape="spline", smoothing=.6),
+                fill="tozeroy", fillcolor="rgba(0,224,84,.10)",
                 hovertemplate="%{x|%b %Y}: %{y} filmes<extra></extra>"))
-            fig.update_layout(yaxis_title="filmes por mês")
-            add(G, "Volume mensal", f"Filmes por mês{note}", fig, 370)
+            if len(m) >= 6:
+                roll = m.rolling(3, center=True).mean()
+                fig.add_trace(go.Scatter(
+                    x=roll.index, y=roll.values, mode="lines",
+                    name="média móvel (3 meses)",
+                    line=dict(color=TEXT, width=2.5),
+                    hovertemplate="%{x|%b %Y}: %{y:.1f}<extra>média móvel</extra>"))
+            fig.update_layout(yaxis_title="filmes por mês",
+                              legend=dict(orientation="h", y=1.12))
+            add(G, "Volume mensal",
+                f"Filmes por mês; a linha clara suaviza picos de maratona{note}",
+                fig, 370)
 
         cal = stats.weekly_calendar(diary)
         if len(cal) and cal.values.sum() >= 20:
@@ -346,7 +481,16 @@ def _build_content(
 
     pf = stats.personal_favorites(films)
     n_top = int((rated["Rating"] >= 4.5).sum()) if len(rated) else 0
-    if len(pf) >= 5:
+    pf_sub = (f"Você deu 4.5★ ou 5★ a {n_top} filmes; ranqueá-los entre si não "
+              "diz nada. O informativo é a distância da média: estes são os "
+              "favoritos que mais dependem do <i>seu</i> gosto (30+ votos no TMDB).")
+    if len(pf) >= 5 and "poster" in pf and pf["poster"].notna().sum() >= 5:
+        items = [dict(name=r.Name, year=r.Year, poster=r.poster,
+                      lines=[f"sua {r.Rating:g}★ · TMDB {r.tmdb_rating / 2:.1f}★",
+                             f"Δ +{r.diff:.1f}"])
+                 for r in pf.itertuples()]
+        add_html(G, "Favoritos mais pessoais", pf_sub, _poster_grid(items))
+    elif len(pf) >= 5:
         fig = go.Figure(go.Table(
             columnwidth=[3, 1, 1, 1, 1],
             header=dict(values=["<b>Filme</b>", "<b>Ano</b>", "<b>Sua nota</b>",
@@ -361,11 +505,42 @@ def _build_content(
                        font=dict(color=TEXT, size=12.5),
                        align="left", height=28)))
         fig.update_layout(margin=dict(l=8, r=8, t=8, b=8))
-        add(G, "Favoritos mais pessoais",
-            f"Você deu 4.5★ ou 5★ a {n_top} filmes; ranqueá-los entre si não "
-            "diz nada. O informativo é a distância da média: estes são os "
-            "favoritos que mais dependem do <i>seu</i> gosto (considerados "
-            "apenas filmes com 30+ votos no TMDB).", fig, 380)
+        add(G, "Favoritos mais pessoais", pf_sub, fig, 380)
+
+    if "poster" in films and "genres" in films and films["poster"].notna().any():
+        expl_g = rated.explode("genres").dropna(subset=["genres"])
+        if len(expl_g):
+            champs, used = [], set()
+            for gen in expl_g["genres"].value_counts().head(6).index:
+                grp_df = expl_g[(expl_g["genres"] == gen) & ~expl_g["Name"].isin(used)]
+                if grp_df.empty:
+                    continue
+                if "tmdb_votes" in grp_df:
+                    grp_df = grp_df.sort_values(["Rating", "tmdb_votes"],
+                                                ascending=False)
+                else:
+                    grp_df = grp_df.sort_values("Rating", ascending=False)
+                best = grp_df.iloc[0]
+                used.add(best["Name"])
+                champs.append(dict(name=best["Name"], year=best["Year"],
+                                   poster=best.get("poster"), badge=gen,
+                                   lines=[f"{best['Rating']:g}★"]))
+            if len(champs) >= 4:
+                add_html(G, "Melhor avaliado por gênero",
+                         "Sua maior nota em cada um dos gêneros mais vistos",
+                         _poster_grid(champs))
+
+    if "poster" in films and "tmdb_votes" in films:
+        gems = films.dropna(subset=["Rating", "tmdb_votes"])
+        gems = gems[(gems["Rating"] >= 4.5) & (gems["tmdb_votes"].between(30, 1500))]
+        gems = gems.sort_values("tmdb_votes").head(8)
+        if len(gems) >= 4 and gems["poster"].notna().sum() >= 4:
+            items = [dict(name=r.Name, year=r.Year, poster=r.poster,
+                          lines=[f"{r.Rating:g}★ · {int(r.tmdb_votes)} votos"])
+                     for r in gems.itertuples()]
+            add_html(G, "Joias escondidas",
+                     "Nota 4.5★+ sua em filmes que pouca gente viu "
+                     "(30 a 1500 votos no TMDB)", _poster_grid(items))
 
     if "tmdb_votes" in films:
         pop = films.dropna(subset=["tmdb_votes", "Rating"])
@@ -378,10 +553,20 @@ def _build_content(
                             colorscale=[[0, GRAD[PURPLE]], [1, GREEN]],
                             showscale=False, opacity=.7, line_width=0),
                 hovertemplate="%{text}: %{y}★, %{x} votos<extra></extra>"))
+            trend = stats.binned_trend(np.log10(pop["tmdb_votes"]), pop["Rating"])
+            if trend:
+                xs, ys = trend
+                fig.add_trace(go.Scatter(
+                    x=10 ** xs, y=ys, mode="lines+markers", name="tendência",
+                    line=dict(color=TEXT, width=2.5),
+                    marker=dict(size=6, color=TEXT),
+                    hovertemplate="nota média %{y:.2f}<extra>tendência</extra>"))
             fig.update_xaxes(type="log", title="votos no TMDB (escala log)")
             fig.update_yaxes(title="sua nota", dtick=0.5)
+            fig.update_layout(showlegend=False)
             add(G, "Popularidade × avaliação",
-                "Cada ponto é um filme; à esquerda, os menos conhecidos", fig, 460)
+                "Cada ponto é um filme; a linha clara é a nota média por faixa "
+                "de popularidade — ela sobe ou desce com a fama?", fig, 460)
 
     # ================================================== o que você assiste
     G = "O que você assiste"
@@ -416,6 +601,37 @@ def _build_content(
             add(G, "Defasagem lançamento → visualização",
                 f"Mediana de {gap.median():.0f} anos{note}", fig, 380)
 
+    if has_diary:
+        rv = stats.release_vs_watch(films, diary)
+        if len(rv) >= 30:
+            rv_r = rv.dropna(subset=["Rating"])
+            rv_n = rv[rv["Rating"].isna()]
+            fig = go.Figure()
+            if len(rv_n):
+                fig.add_trace(go.Scatter(
+                    x=rv_n["release_year"], y=rv_n["watch_year"], mode="markers",
+                    text=rv_n["Name"], marker=dict(size=6, color="#4a5762",
+                                                   opacity=.5, line_width=0),
+                    name="sem nota",
+                    hovertemplate="%{text} (%{x})<extra></extra>"))
+            if len(rv_r):
+                fig.add_trace(go.Scatter(
+                    x=rv_r["release_year"], y=rv_r["watch_year"], mode="markers",
+                    text=rv_r["Name"],
+                    marker=dict(size=7, color=rv_r["Rating"], cmin=0.5, cmax=5,
+                                colorscale=[[0, RED], [.5, YELLOW], [1, GREEN]],
+                                opacity=.85, line_width=0,
+                                colorbar=dict(title="nota", outlinewidth=0,
+                                              tickfont=dict(color=TEXT))),
+                    name="com nota",
+                    hovertemplate="%{text} (%{x}): %{marker.color}★<extra></extra>"))
+            fig.update_layout(xaxis_title="ano de lançamento",
+                              yaxis_title="ano em que você assistiu",
+                              showlegend=False)
+            add(G, "Lançamento × visualização",
+                "Faixas horizontais revelam fases: o ano em que você mergulhou "
+                f"numa década ou cineasta específico{note}", fig, 480)
+
     g = stats.explode_count(films, "genres", 15)
     if len(g):
         add(G, "Filmes por gênero", "Fonte: TMDB", _hbar(g, GREEN), 480)
@@ -436,8 +652,8 @@ def _build_content(
                               xaxis=dict(dtick=0.5))
             fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
             add(G, "Distribuição das notas por gênero",
-                "Boxplot nos 8 gêneros mais vistos (traço = mediana, "
-                "losango = média)", fig, 460)
+                "Boxplot nos 8 gêneros mais vistos (traço central = mediana, "
+                "linha tracejada = média)", fig, 460)
 
     if has_diary:
         trend = stats.genre_trend(diary, films)
@@ -563,20 +779,27 @@ def _build_content(
 
     # ================================================== pessoas e lugares
     G = "Pessoas e lugares"
-    ds = stats.director_stats(films, min_count=3)
+    ds = stats.director_stats_full(films, min_count=3)
     if len(ds) >= 5:
         fig = go.Figure(go.Scatter(
             x=ds["n"], y=ds["nota"], mode="markers+text",
             text=list(ds.index), textposition="top center",
             textfont=dict(size=11, color=MUTED),
+            error_y=dict(type="data", array=ds["std"], visible=True,
+                         color="rgba(153,170,187,.45)", thickness=1.5, width=4),
+            customdata=np.stack([ds["std"], ds["bayes"]], axis=-1),
             marker=dict(size=ds["n"] / ds["n"].max() * 26 + 10,
-                        color=ds["nota"], cmin=max(0, ds["nota"].min() - .3),
+                        color=ds["bayes"], cmin=max(0, ds["bayes"].min() - .3),
                         colorscale=[[0, GRAD[ORANGE]], [1, GREEN]],
                         showscale=False, line=dict(width=1.5, color=CARD)),
-            hovertemplate="%{text}: %{x} filmes, %{y:.2f}★<extra></extra>"))
+            hovertemplate=("%{text}: %{x} filmes, %{y:.2f}★ ± %{customdata[0]:.2f}"
+                           "<br>média bayesiana %{customdata[1]:.2f}★"
+                           "<extra></extra>")))
         fig.update_layout(xaxis_title="filmes vistos", yaxis_title="sua nota média")
-        add(G, "Diretores: volume × avaliação",
-            "Mín. 3 filmes avaliados por diretor(a)", fig, 500)
+        add(G, "Diretores: volume × avaliação × consistência",
+            "Barra vertical = desvio-padrão (curta = consistente, longa = "
+            "ama-ou-odeia); cor = média bayesiana, que desconta amostras pequenas",
+            fig, 520)
     else:
         d = stats.explode_count(films, "directors", 15)
         if len(d):
@@ -586,6 +809,15 @@ def _build_content(
     if len(a):
         add(G, "Atores e atrizes mais frequentes",
             "Top 8 créditos de cada filme", _hbar(a, BLUE), 480)
+
+    pairs = stats.collaboration_edges(films)
+    if len(pairs) >= 5:
+        add(G, "Rede de colaborações diretor–ator",
+            "Parcerias com 2+ filmes no seu histórico; espessura da linha = "
+            "filmes juntos. As \"panelinhas\" do seu cinema.",
+            _network_fig(pairs), max(420, 40 * max(
+                pairs.index.get_level_values(0).nunique(),
+                pairs.index.get_level_values(1).nunique()) + 120))
 
     if "countries" in films:
         c = films["countries"].dropna().explode().dropna().value_counts()
@@ -640,7 +872,7 @@ def _build_content(
 # ------------------------------------------------------------------ template
 
 
-def _render_tab(cards, facts, sections) -> str:
+def _render_tab(cards, facts, sections, idx: int = 0) -> str:
     cards_html = "".join(
         f'<div class="card"><div class="big">{v}</div><div class="lbl">{lbl}</div></div>'
         for v, lbl in cards
@@ -649,16 +881,23 @@ def _render_tab(cards, facts, sections) -> str:
     if facts:
         items = "".join(f"<li>{f}</li>" for f in facts)
         facts_html = f'<section><h2>Insights</h2><ul class="facts">{items}</ul></section>'
+    groups = list(dict.fromkeys(grp for grp, *_ in sections))
+    nav = ""
+    if len(groups) >= 3:
+        links = " · ".join(f'<a href="#t{idx}-g{k}">{g}</a>'
+                           for k, g in enumerate(groups))
+        nav = f'<div class="quicknav">Ir para: {links}</div>'
     secs = ""
     current_group = None
     for grp, title, sub, body in sections:
         if grp != current_group:
-            secs += f'<div class="group"><span>{grp}</span></div>\n'
+            k = groups.index(grp)
+            secs += f'<div class="group" id="t{idx}-g{k}"><span>{grp}</span></div>\n'
             current_group = grp
         sub_html = f'<p class="sub">{sub}</p>' if sub else ""
         secs += (f'<section><h2>{title}</h2>{sub_html}'
                  f'<div class="plot">{body}</div></section>\n')
-    return f'<div class="cards">{cards_html}</div>\n{facts_html}\n{secs}'
+    return f'<div class="cards">{cards_html}</div>\n{nav}\n{facts_html}\n{secs}'
 
 
 def _write_html(tabs, films, diary, frames, out: Path, year):
@@ -675,7 +914,7 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
         ) + "</nav>"
     for i, (_label, cards, facts, sections) in enumerate(tabs):
         panes_html += (f'<div class="tabpane" id="tab-{i}">'
-                       f"{_render_tab(cards, facts, sections)}</div>\n")
+                       f"{_render_tab(cards, facts, sections, i)}</div>\n")
 
     n_enriched = films["tmdb_id"].notna().sum() if "tmdb_id" in films else 0
     period = ""
@@ -683,6 +922,15 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
         period = (f'{diary["Watched Date"].min():%d/%m/%Y} — '
                   f'{diary["Watched Date"].max():%d/%m/%Y}')
     title = f"Retrospectiva {year}" if year else "Letterboxd Explorer"
+
+    lead = ""
+    top_g = stats.explode_count(films, "genres", 1)
+    top_d = stats.explode_count(films, "directors", 1)
+    rated_all = films.dropna(subset=["Rating"])
+    if len(top_g) and len(top_d) and len(rated_all):
+        lead = (f'<p class="lead">Um acervo dominado por <b>{top_g.index[0]}</b>, '
+                f"com <b>{top_d.index[0]}</b> como presença mais constante e "
+                f'nota média de <b>{rated_all["Rating"].mean():.2f}★</b>.</p>')
 
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -723,6 +971,20 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
   .facts li {{ background:{CARD}; border:1px solid #2c3440; border-radius:12px;
                padding:14px 16px; font-size:.95rem; }}
   .facts b {{ color:{GREEN}; }}
+  .postergrid {{ display:grid; gap:14px; padding:10px;
+                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }}
+  .pcell {{ margin:0; position:relative; }}
+  .pcell img {{ width:100%; border-radius:10px; display:block;
+                border:1px solid #2c3440; }}
+  .noposter {{ width:100%; aspect-ratio:2/3; border-radius:10px;
+               background:#232b32; display:flex; align-items:center;
+               justify-content:center; font-size:2rem;
+               border:1px solid #2c3440; }}
+  .badge {{ position:absolute; top:8px; left:8px; background:{GREEN};
+            color:{BG}; font-size:.72rem; font-weight:700;
+            padding:3px 9px; border-radius:12px; z-index:1; }}
+  .pname {{ font-size:.85rem; font-weight:600; margin-top:7px; }}
+  .pmeta {{ font-size:.78rem; color:{MUTED}; margin-top:2px; }}
   footer {{ margin-top:60px; text-align:center; color:{MUTED}; font-size:.8rem; }}
   footer a {{ color:{BLUE}; }}
   .tabs {{ position: sticky; top: 0; z-index: 10; background:{BG};
@@ -734,6 +996,20 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
   .tabs button:hover {{ border-color:{GREEN}; }}
   .tabs button.active {{ background:{GREEN}; color:{BG}; font-weight:700;
                          border-color:{GREEN}; }}
+  html {{ scroll-behavior: smooth; }}
+  .lead {{ color:{TEXT}; font-size:1.02rem; max-width:640px;
+           margin: 14px auto 0; }}
+  .lead b {{ color:{GREEN}; }}
+  .quicknav {{ text-align:center; color:{MUTED}; font-size:.88rem;
+               margin: 20px 0 4px; }}
+  .quicknav a {{ color:{BLUE}; text-decoration:none; }}
+  .quicknav a:hover {{ text-decoration:underline; }}
+  #totop {{ position:fixed; right:22px; bottom:22px; z-index:20;
+            background:{CARD}; color:{TEXT}; border:1px solid #2c3440;
+            border-radius:50%; width:44px; height:44px; font-size:1.2rem;
+            cursor:pointer; opacity:0; pointer-events:none; transition:.2s; }}
+  #totop.show {{ opacity:.92; pointer-events:auto; }}
+  #totop:hover {{ border-color:{GREEN}; }}
 </style>
 </head>
 <body>
@@ -741,6 +1017,7 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
   <header>
     <h1>🎬 {title}</h1>
     <p>{("@" + username + " · ") if username else ""}{len(films)} filmes · {n_enriched} enriquecidos via TMDB{(" · " + period) if period else ""}</p>
+  {lead}
   </header>
   {nav_html}
   {panes_html}
@@ -748,7 +1025,12 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
     Explorer</a> · dados de filmes por <a href="https://www.themoviedb.org">TMDB</a>
     (este produto usa a API do TMDB mas não é endossado ou certificado pelo TMDB).</footer>
 </div>
+<button id="totop" title="voltar ao topo"
+  onclick="window.scrollTo({{top:0, behavior:'smooth'}})">↑</button>
 <script>
+window.addEventListener('scroll', function () {{
+  document.getElementById('totop').classList.toggle('show', window.scrollY > 600);
+}});
 function showTab(i) {{
   document.querySelectorAll('.tabpane').forEach(function (el, j) {{
     el.style.display = (i === j) ? '' : 'none';

@@ -23,3 +23,10 @@ def test_insights_generate(films, diary):
 def test_insights_no_diary(films):
     facts = insights.generate(films, None)
     assert isinstance(facts, list)
+
+
+def test_iso_map_covers_africa():
+    from letterboxd_explorer.report import ISO2_TO_ISO3
+
+    for code in ["BF", "ML", "CI", "CM", "AO", "MZ", "SN", "EG", "ET", "CD"]:
+        assert code in ISO2_TO_ISO3

@@ -78,6 +78,7 @@ class TmdbClient:
 
         return {
             "tmdb_id": m["id"],
+            "poster": m.get("poster_path"),
             "genres": [g["name"] for g in m.get("genres", [])],
             "keywords": [k["name"] for k in m.get("keywords", {}).get("keywords", [])],
             "countries": [c["iso_3166_1"] for c in m.get("production_countries", [])],
@@ -144,6 +145,27 @@ def enrich(
                 done += 1
                 if done % 50 == 0 or done == len(missing):
                     print(f"  {done}/{len(missing)}")
+                    save_cache(cache, cache_path)
+        save_cache(cache, cache_path)
+
+    # caches criados antes da v1.6 não têm pôster; completa só esse campo
+    stale = [(k, v["tmdb_id"]) for k, v in cache.items()
+             if v and "poster" not in v and v.get("tmdb_id")]
+    if stale and not offline and key:
+        client = TmdbClient(key)
+        print(f"Baixando pôsteres de {len(stale)} filmes já em cache...")
+
+        def _poster(mid):
+            try:
+                return client._get(f"movie/{mid}").get("poster_path")
+            except Exception:
+                return None
+
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            futures = {pool.submit(_poster, mid): k for k, mid in stale}
+            for i, fut in enumerate(as_completed(futures), 1):
+                cache[futures[fut]]["poster"] = fut.result()
+                if i % 200 == 0:
                     save_cache(cache, cache_path)
         save_cache(cache, cache_path)
     elif missing:

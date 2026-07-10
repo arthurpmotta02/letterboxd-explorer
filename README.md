@@ -2,9 +2,27 @@
 
 Você entrega o export oficial da sua conta do Letterboxd e recebe um **relatório HTML interativo em arquivo único**: abre em qualquer navegador, dá para mandar por WhatsApp. O export do Letterboxd traz só título, ano, nota e data; gêneros, diretores, elenco, países, duração e keywords são enriquecidos pela [API do TMDB](https://developer.themoviedb.org/) com cache local.
 
+## Demonstração
+
+> Imagens geradas com `--save-figs docs/figs` (veja Opções) a partir de um export real.
+
+![Calendário de atividade](docs/figs/calendario_atividade.png)
+
+| | |
+|---|---|
+| ![Sua nota × TMDB](docs/figs/voce_vs_tmdb.png) | ![Maiores divergências](docs/figs/maiores_divergencias.png) |
+| ![Notas por gênero](docs/figs/boxplot_generos.png) | ![Perfil por gênero](docs/figs/perfil_por_genero.png) |
+| ![Diretores: volume, avaliação e consistência](docs/figs/diretores_volume_avaliacao.png) | ![Rede de colaborações](docs/figs/rede_colaboracoes.png) |
+| ![Lançamento × visualização](docs/figs/lancamento_x_visualizacao.png) | ![Popularidade × avaliação](docs/figs/popularidade_x_avaliacao.png) |
+| ![Evolução dos gêneros](docs/figs/evolucao_generos.png) | ![Sazonalidade dos gêneros](docs/figs/sazonalidade_generos.png) |
+
+![Mapa de países](docs/figs/mapa_paises.png)
+
+As seções com pôsteres (favoritos mais pessoais, melhor por gênero, joias escondidas) e as abas por ano são interativas: veja no HTML.
+
 ## O que o relatório mostra
 
-Mais de 25 visualizações: perfil de gosto (radar), calendário de atividade estilo GitHub, ritmo mensal e curva acumulada, distribuição e evolução das suas notas, hall da fama, você × crítica (com suas maiores "heresias"), décadas, teste de nostalgia, gêneros e microgêneros, sazonalidade dos gêneros (terror em outubro?), suas fases ano a ano, diretores e atores, mapa-múndi dos países de produção, idiomas, duração, filmes-conforto, obscurômetro, indie × blockbuster, e insights automáticos estilo Wrapped (seu dia de cinema, maior maratona, índice hipster, viés de nostalgia...). O relatório tem **abas por ano**: clique em Tudo, 2026, 2025... e veja tudo recalculado só para aquele ano.
+Mais de 25 visualizações: perfil de gosto (radar), calendário de atividade estilo GitHub, ritmo mensal e curva acumulada, distribuição e evolução das suas notas, hall da fama, você × crítica (com suas maiores "heresias"), décadas, teste de nostalgia, gêneros e microgêneros, sazonalidade dos gêneros (terror em outubro?), suas fases ano a ano, diretores e atores, mapa-múndi dos países de produção, idiomas, duração, filmes-conforto, obscurômetro, indie × blockbuster, e insights automáticos estilo Wrapped (seu dia de cinema, maior maratona, coeficiente cult, saudosismo...). O relatório tem **abas por ano** (Tudo, 2026, 2025...) com tudo recalculado por ano, e seções com **pôsteres via TMDB**: favoritos mais pessoais, melhor avaliado por gênero e joias escondidas (nota alta sua em filmes que pouca gente viu). Curtas-metragens (≤40 min) têm faixa própria nas análises de duração. Há ainda uma **rede bipartida diretor–ator** (as "panelinhas" do seu cinema), resumo executivo automático, navegação rápida por blocos e análises com rigor estatístico: médias bayesianas, desvio-padrão por diretor e linhas de tendência.
 
 ## Instalação
 
@@ -57,7 +75,10 @@ letterboxd-explorer EXPORT [opções]
                    relatório padrão já tem abas por ano)
 --offline          usa só o cache local, sem API
 --cache arquivo    caminho do cache
+--save-figs PASTA  exporta as figuras principais como PNG (pip install kaleido)
 ```
+
+`--save-figs docs/figs` gera 16 PNGs prontos para ilustrar um README ou post, incluindo calendário, radar, scatters, boxplot, rede de colaborações e o mapa.
 
 ### Demo sem chave
 
@@ -112,9 +133,17 @@ CI no GitHub Actions roda lint e testes em Python 3.10 e 3.12. Os testes usam fi
 
 **Busca com fallback.** O ano do Letterboxd às vezes diverge do TMDB (festival × lançamento comercial); a busca tenta com o ano e repete sem ele. Filme não encontrado não quebra o relatório.
 
+## Por que TMDB e não a API do Letterboxd?
+
+A [API oficial do Letterboxd](https://letterboxd.com/api-beta/) é liberada apenas mediante aprovação e, atualmente, **não concede acesso para projetos de análise e visualização de dados**. A própria página recomenda usar o export oficial da conta para os dados pessoais e o [TMDB](https://developer.themoviedb.org/docs/getting-started) para metadados de filmes: exatamente a arquitetura deste projeto. Se essa política mudar, o plano é migrar o enriquecimento para a API do Letterboxd.
+
+## Análises consideradas e descartadas
+
+**Curva de sobrevivência (Kaplan-Meier) da watchlist.** A ideia seria modelar "quanto tempo um filme sobrevive na watchlist até ser assistido". Descartada por limitação do dado, não da técnica: o `watchlist.csv` só traz a data de adição dos filmes **ainda não assistidos** (censurados); para os que saíram da lista, a data de adição se perde no export. Sem o tempo de entrada do grupo que sofreu o evento, a curva seria enviesada por construção.
+
 ## Tratamento de dados ausentes
 
-**Filmes sem nota.** O Letterboxd só permite notas de 0.5★ a 5★ (não existe "nota zero"). Filmes assistidos sem nota entram em todas as contagens (volume, horas, gêneros, países, décadas...), mas são excluídos de qualquer análise de avaliação — sem imputação, o que evita distorcer médias e distribuições.
+**Filmes sem nota.** O Letterboxd só permite notas de 0.5★ a 5★ (não existe "nota zero"). Filmes assistidos sem nota entram em todas as contagens (volume, horas, gêneros, países, décadas...), mas são excluídos de qualquer análise de avaliação: sem imputação, o que evita distorcer médias e distribuições.
 
 **Filmes sem correspondência no TMDB.** Ficam de fora apenas das análises enriquecidas (gêneros, diretores, mapa...); o relatório informa no cabeçalho quantos foram enriquecidos.
 

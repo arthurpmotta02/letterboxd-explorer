@@ -27,6 +27,9 @@ def main(argv: list[str] | None = None) -> None:
                     help="Não consulta a API; usa apenas tmdb_cache.json")
     ap.add_argument("--cache", type=Path, default=tmdb.DEFAULT_CACHE,
                     help="Caminho do cache TMDB (padrão: tmdb_cache.json)")
+    ap.add_argument("--save-figs", type=Path, default=None, metavar="PASTA",
+                    help="Também exporta as figuras principais como PNG "
+                         "(requer: pip install kaleido)")
     ap.add_argument("--version", action="version", version=__version__)
     args = ap.parse_args(argv)
 
@@ -45,7 +48,8 @@ def main(argv: list[str] | None = None) -> None:
         default_name = (f"retrospectiva_{args.year}.html" if args.year
                         else "relatorio_letterboxd.html")
         out = Path(args.output or default_name)
-        report.build_report(films, diary, frames, out, year=args.year)
+        report.build_report(films, diary, frames, out, year=args.year,
+                            save_figs=args.save_figs)
         print(f"\n✔ Relatório salvo em: {out.resolve()}")
     except ingest.ExportError as e:
         sys.exit(f"Erro: {e}")
