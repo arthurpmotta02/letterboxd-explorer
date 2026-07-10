@@ -364,7 +364,8 @@ def _build_content(
         add(G, "Favoritos mais pessoais",
             f"Você deu 4.5★ ou 5★ a {n_top} filmes; ranqueá-los entre si não "
             "diz nada. O informativo é a distância da média: estes são os "
-            "favoritos que mais dependem do <i>seu</i> gosto.", fig, 380)
+            "favoritos que mais dependem do <i>seu</i> gosto (considerados "
+            "apenas filmes com 30+ votos no TMDB).", fig, 380)
 
     if "tmdb_votes" in films:
         pop = films.dropna(subset=["tmdb_votes", "Rating"])

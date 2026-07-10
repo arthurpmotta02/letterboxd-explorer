@@ -97,6 +97,14 @@ def test_personal_favorites(films):
     assert list(pf["Name"]) == ["D", "A", "B"]
 
 
+def test_personal_favorites_excludes_zero_votes(films):
+    films = films.copy()
+    films.loc[0, "tmdb_rating"] = 0.0   # "média" sem votos
+    films.loc[0, "tmdb_votes"] = 0
+    pf = stats.personal_favorites(films, min_rating=3.0)
+    assert "A" not in list(pf["Name"])  # diff +5.0 falso não entra
+
+
 def test_budget_buckets_empty(films):
     assert stats.budget_buckets(films).empty  # fixture sem coluna budget
 

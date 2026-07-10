@@ -164,7 +164,7 @@ def rating_by_runtime(films: pd.DataFrame, min_count: int = 5) -> pd.DataFrame:
 
 
 def personal_favorites(films: pd.DataFrame, top: int = 10,
-                       min_rating: float = 4.5) -> pd.DataFrame:
+                       min_rating: float = 4.5, min_votes: int = 30) -> pd.DataFrame:
     """Entre suas maiores notas, os filmes mais distantes da nota TMDB.
 
     Ranquear os 5 estrelas entre si não faz sentido (empate). O que é
@@ -176,6 +176,9 @@ def personal_favorites(films: pd.DataFrame, top: int = 10,
     if "tmdb_rating" not in films or rated.empty:
         return rated.head(0)
     rated = rated.dropna(subset=["tmdb_rating"]).copy()
+    # nota TMDB com poucos votos não é comparável (0 votos => média 0.0)
+    if "tmdb_votes" in rated:
+        rated = rated[rated["tmdb_votes"].fillna(0) >= min_votes]
     rated["diff"] = rated["Rating"] - rated["tmdb_rating"] / 2
     return rated.sort_values("diff", ascending=False).head(top)
 
