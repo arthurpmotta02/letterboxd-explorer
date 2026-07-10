@@ -10,7 +10,7 @@ Você entrega o export oficial da sua conta do Letterboxd e recebe um **relatór
 
 | | |
 |---|---|
-| ![Sua nota × TMDB](docs/figs/voce_vs_tmdb.png) | ![Maiores divergências](docs/figs/maiores_divergencias.png) |
+| ![Sua nota × TMDB](docs/figs/voce_vs_tmdb.png) | ![Distribuição das notas](docs/figs/distribuicao_notas.png) |
 | ![Notas por gênero](docs/figs/boxplot_generos.png) | ![Perfil por gênero](docs/figs/perfil_por_genero.png) |
 | ![Diretores: volume, avaliação e consistência](docs/figs/diretores_volume_avaliacao.png) | ![Rede de colaborações](docs/figs/rede_colaboracoes.png) |
 | ![Lançamento × visualização](docs/figs/lancamento_x_visualizacao.png) | ![Popularidade × avaliação](docs/figs/popularidade_x_avaliacao.png) |
