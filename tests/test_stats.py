@@ -180,3 +180,22 @@ def test_collaboration_edges():
     pairs = stats.collaboration_edges(films, min_films=2)
     assert pairs.loc[("Fassbinder", "Schygulla")] == 2
     assert ("Outro", "Z") not in pairs.index  # só 1 filme juntos
+
+
+def test_enrich_retry_misses(tmp_path, monkeypatch):
+    import json
+
+    from letterboxd_explorer import tmdb
+
+    films = pd.DataFrame({"Name": ["Adulto"], "Year": pd.array([2001], dtype="Int64")})
+    cache = tmp_path / "c.json"
+    cache.write_text(json.dumps({"Adulto|2001": None}))  # falhou antes
+    # sem retry: não busca nada (offline não levanta erro)
+    out = tmdb.enrich(films, key=None, offline=True, cache_path=cache)
+    assert "tmdb_id" not in out or out["tmdb_id"].isna().all()
+    # com retry: o filme volta para a fila e exige chave
+    import pytest
+
+    with pytest.raises(SystemExit):
+        tmdb.enrich(films, key=None, offline=False, cache_path=cache,
+                    retry_misses=True)

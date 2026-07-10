@@ -61,7 +61,9 @@ class TmdbClient:
 
     def fetch_movie(self, name: str, year) -> dict | None:
         """Busca um filme e retorna os campos usados nas análises."""
-        params: dict = {"query": name, "include_adult": "false"}
+        # include_adult: sem isso, títulos adultos do histórico simplesmente
+        # não são encontrados e ficam fora de TODAS as análises
+        params: dict = {"query": name, "include_adult": "true"}
         if pd.notna(year):
             params["year"] = int(year)
         try:
@@ -112,6 +114,7 @@ def enrich(
     key: str | None,
     offline: bool = False,
     cache_path: Path = DEFAULT_CACHE,
+    retry_misses: bool = False,
 ) -> pd.DataFrame:
     """Anexa metadados TMDB a cada filme, usando/alimentando o cache local.
 
@@ -119,9 +122,14 @@ def enrich(
     periodicamente, então interromper no meio não perde progresso.
     """
     cache = load_cache(cache_path)
-    missing = [
-        (r.Name, r.Year) for r in films.itertuples() if f"{r.Name}|{r.Year}" not in cache
-    ]
+
+    def _pending(r):
+        k = f"{r.Name}|{r.Year}"
+        if k not in cache:
+            return True
+        return retry_misses and cache[k] is None  # rebusca os não-encontrados
+
+    missing = [(r.Name, r.Year) for r in films.itertuples() if _pending(r)]
 
     if missing and not offline:
         if not key:

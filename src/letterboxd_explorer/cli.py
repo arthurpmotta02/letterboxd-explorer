@@ -27,6 +27,9 @@ def main(argv: list[str] | None = None) -> None:
                     help="Não consulta a API; usa apenas tmdb_cache.json")
     ap.add_argument("--cache", type=Path, default=tmdb.DEFAULT_CACHE,
                     help="Caminho do cache TMDB (padrão: tmdb_cache.json)")
+    ap.add_argument("--retry-misses", action="store_true",
+                    help="Rebusca no TMDB os filmes que ficaram sem "
+                         "correspondência em execuções anteriores")
     ap.add_argument("--save-figs", type=Path, default=None, metavar="PASTA",
                     help="Também exporta as figuras principais como PNG "
                          "(requer: pip install kaleido)")
@@ -43,7 +46,8 @@ def main(argv: list[str] | None = None) -> None:
             films, diary = ingest.filter_year(films, diary, args.year)
             print(f"Retrospectiva {args.year}: {len(films)} filmes.")
 
-        films = tmdb.enrich(films, args.tmdb_key, args.offline, args.cache)
+        films = tmdb.enrich(films, args.tmdb_key, args.offline, args.cache,
+                            retry_misses=args.retry_misses)
 
         default_name = (f"retrospectiva_{args.year}.html" if args.year
                         else "relatorio_letterboxd.html")

@@ -68,7 +68,7 @@ O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), 
 * **Diretores: volume × avaliação × consistência**: scatter com barras de desvio-padrão (consistente vs. ama-ou-odeia) e cor pela média bayesiana, que desconta amostras pequenas.
 * **Atores e atrizes mais frequentes**.
 * **Rede de colaborações diretor–ator**: diagrama bipartido das parcerias com 2+ filmes.
-* **Mapa-múndi dos países de produção** em escala logarítmica (cobertura ISO completa).
+* **Mapa-múndi dos países de produção** em escala logarítmica, com os 249 códigos ISO 3166 mapeados (nenhum país é descartado silenciosamente).
 * **Idiomas originais** com nomes legíveis.
 
 ## Instalação
@@ -121,6 +121,7 @@ letterboxd-explorer EXPORT [opções]
 --year 2025        exporta um HTML separado só com um ano (opcional; o
                    relatório padrão já tem abas por ano)
 --offline          usa só o cache local, sem API
+--retry-misses     rebusca filmes sem correspondência de execuções anteriores
 --cache arquivo    caminho do cache
 --save-figs PASTA  exporta as figuras principais como PNG (pip install kaleido)
 ```
@@ -192,7 +193,7 @@ A [API oficial do Letterboxd](https://letterboxd.com/api-beta/) é liberada apen
 
 **Filmes sem nota.** O Letterboxd só permite notas de 0.5★ a 5★ (não existe "nota zero"). Filmes assistidos sem nota entram em todas as contagens (volume, horas, gêneros, países, décadas...), mas são excluídos de qualquer análise de avaliação: sem imputação, o que evita distorcer médias e distribuições.
 
-**Filmes sem correspondência no TMDB.** Ficam de fora apenas das análises enriquecidas (gêneros, diretores, mapa...); o relatório informa no cabeçalho quantos foram enriquecidos.
+**Filmes sem correspondência no TMDB.** Ficam de fora apenas das análises enriquecidas (gêneros, diretores, mapa...); o relatório informa no cabeçalho quantos foram enriquecidos. A busca inclui títulos adultos (sem `include_adult`, eles nunca seriam encontrados e sumiriam de todas as análises). Se você rodou uma versão antiga, use `--retry-misses` uma vez para rebuscá-los.
 
 **Filmes com zero votos no TMDB.** Aparecem contabilizados no subtítulo de "Filmes menos conhecidos", mas fora das barras (uma barra de comprimento zero não comunica nada).
 
