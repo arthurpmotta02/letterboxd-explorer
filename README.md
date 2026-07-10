@@ -56,7 +56,7 @@ O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), 
 * **Gêneros**: contagem, **boxplot de notas por gênero**, **evolução ano a ano** (área empilhada) e **sazonalidade** (terror em outubro?).
 * **Keywords (microgêneros)** do TMDB: slow burn, neo-noir, coming of age...
 * **Duração**: distribuição com KDE e avaliação por faixa, incluindo curtas (≤40 min).
-* **Orçamento de produção**, **filmes menos conhecidos** (com contagem dos zero-votos) e **rewatches mais frequentes**.
+* **Orçamento de produção**, **raridades do acervo** (pôsteres dos menos votados, com contagem dos zero-votos) e **rewatches mais frequentes**.
 
 ### Watchlist e resenhas
 

@@ -112,15 +112,29 @@ def _fig_html(fig, height=420):
 
 
 def _hbar(series, color, unit="filmes"):
+    """Ranking horizontal em estilo lollipop (haste fina + ponto)."""
     s = series[::-1]
-    fig = go.Figure(go.Bar(
-        x=s.values, y=list(s.index), orientation="h",
-        marker=dict(color=list(s.values),
+    xs, ys = [], []
+    for name, v in s.items():
+        xs += [0, v, None]
+        ys += [name, name, None]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=xs, y=ys, mode="lines",
+        line=dict(color="rgba(153,170,187,.30)", width=2),
+        hoverinfo="skip", showlegend=False))
+    fig.add_trace(go.Scatter(
+        x=list(s.values), y=list(s.index), mode="markers",
+        marker=dict(size=11, color=list(s.values),
                     colorscale=[[0, GRAD.get(color, color)], [1, color]],
-                    line_width=0),
-        hovertemplate="%{y}: %{x} " + unit + "<extra></extra>"))
-    fig.update_layout(xaxis_title=unit, bargap=0.35)
+                    line=dict(width=1.5, color=CARD)),
+        hovertemplate="%{y}: %{x} " + unit + "<extra></extra>",
+        showlegend=False))
+    fig.update_layout(xaxis_title=unit)
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
+    vals = pd.Series(s.values)
+    if len(vals) and vals.max() <= 12 and (vals % 1 == 0).all():
+        fig.update_xaxes(dtick=1, tickformat="d")
     return fig
 
 
@@ -539,8 +553,8 @@ def _build_content(
                           lines=[f"{r.Rating:g}★ · {int(r.tmdb_votes)} votos"])
                      for r in gems.itertuples()]
             add_html(G, "Joias escondidas",
-                     "Nota 4.5★+ sua em filmes que pouca gente viu "
-                     "(30 a 1500 votos no TMDB)", _poster_grid(items))
+                     "Nota 4.5★+ sua em filmes pouco votados no TMDB "
+                     "(30 a 1500 votos)", _poster_grid(items))
 
     if "tmdb_votes" in films:
         pop = films.dropna(subset=["tmdb_votes", "Rating"])
@@ -566,7 +580,7 @@ def _build_content(
             fig.update_layout(showlegend=False)
             add(G, "Popularidade × avaliação",
                 "Cada ponto é um filme; a linha clara é a nota média por faixa "
-                "de popularidade. Ela sobe ou desce com a fama?", fig, 460)
+                "de votos. Ela sobe ou desce com a popularidade?", fig, 460)
 
     # ================================================== o que você assiste
     G = "O que você assiste"
@@ -625,9 +639,12 @@ def _build_content(
                                               tickfont=dict(color=TEXT))),
                     name="com nota",
                     hovertemplate="%{text} (%{x}): %{marker.color}★<extra></extra>"))
+            span = rv["watch_year"].max() - rv["watch_year"].min()
             fig.update_layout(xaxis_title="ano de lançamento",
                               yaxis_title="ano em que você assistiu",
                               showlegend=False)
+            fig.update_yaxes(tickformat="d", dtick=1 if span <= 15 else None)
+            fig.update_xaxes(tickformat="d")
             add(G, "Lançamento × visualização",
                 "Faixas horizontais revelam fases: o ano em que você mergulhou "
                 f"numa década ou cineasta específico{note}", fig, 480)
@@ -721,19 +738,22 @@ def _build_content(
         add(G, "Distribuição por orçamento de produção",
             "Quando informado no TMDB", fig, 360)
 
-    if "tmdb_votes" in films and films["tmdb_votes"].notna().any():
+    if ("tmdb_votes" in films and "poster" in films
+            and films["tmdb_votes"].notna().any()):
         v = films.dropna(subset=["tmdb_votes"])
-        zero = v[v["tmdb_votes"] == 0]
-        obscure = v[(v["tmdb_votes"] > 0) & (v["tmdb_votes"] < 200)]
-        obscure = obscure.sort_values("tmdb_votes").head(10)
-        if len(obscure) >= 3:
-            sub = "Menos votos no TMDB"
-            if len(zero):
-                sub += (f" · além destes, <b>{len(zero)} filmes</b> do seu "
-                        "histórico não receberam voto nenhum")
-            s = pd.Series(obscure["tmdb_votes"].values, index=obscure["Name"])
-            add(G, "Filmes menos conhecidos do seu histórico", sub,
-                _hbar(s[::-1], PURPLE, unit="votos"), 400)
+        zero = int((v["tmdb_votes"] == 0).sum())
+        rare = v[v["tmdb_votes"] > 0].nsmallest(10, "tmdb_votes")
+        rare = rare[rare["tmdb_votes"] < 200]
+        if len(rare) >= 4 and rare["poster"].notna().sum() >= 4:
+            sub = "Os registros com menos votos no TMDB em todo o seu histórico"
+            if zero:
+                sub += (f" · além destes, <b>{zero} filmes</b> seus não "
+                        "receberam voto nenhum")
+            items = [dict(name=r.Name, year=r.Year, poster=r.poster,
+                          lines=[f"{int(r.tmdb_votes)} voto"
+                                 + ("s" if r.tmdb_votes > 1 else "")])
+                     for r in rare.itertuples()]
+            add_html(G, "Raridades do acervo", sub, _poster_grid(items))
 
     if has_diary:
         rw = stats.most_rewatched(diary)
@@ -781,9 +801,13 @@ def _build_content(
     G = "Pessoas e lugares"
     ds = stats.director_stats_full(films, min_count=3)
     if len(ds) >= 5:
+        destaque = (set(ds.nlargest(8, "n").index)
+                    | set(ds.nlargest(2, "nota").index)
+                    | set(ds.nsmallest(2, "nota").index))
+        labels = [n if n in destaque else "" for n in ds.index]
         fig = go.Figure(go.Scatter(
             x=ds["n"], y=ds["nota"], mode="markers+text",
-            text=list(ds.index), textposition="top center",
+            text=labels, hovertext=list(ds.index), textposition="top center",
             textfont=dict(size=11, color=MUTED),
             error_y=dict(type="data", array=ds["std"], visible=True,
                          color="rgba(153,170,187,.45)", thickness=1.5, width=4),
@@ -792,10 +816,11 @@ def _build_content(
                         color=ds["bayes"], cmin=max(0, ds["bayes"].min() - .3),
                         colorscale=[[0, GRAD[ORANGE]], [1, GREEN]],
                         showscale=False, line=dict(width=1.5, color=CARD)),
-            hovertemplate=("%{text}: %{x} filmes, %{y:.2f}★ ± %{customdata[0]:.2f}"
-                           "<br>média bayesiana %{customdata[1]:.2f}★"
-                           "<extra></extra>")))
+            hovertemplate=("%{hovertext}: %{x} filmes, %{y:.2f}★ ± "
+                           "%{customdata[0]:.2f}<br>média bayesiana "
+                           "%{customdata[1]:.2f}★<extra></extra>")))
         fig.update_layout(xaxis_title="filmes vistos", yaxis_title="sua nota média")
+        fig.update_xaxes(range=[max(0, ds["n"].min() - 2), ds["n"].max() + 2.5])
         add(G, "Diretores: volume × avaliação × consistência",
             "Barra vertical = desvio-padrão (curta = consistente, longa = "
             "ama-ou-odeia); cor = média bayesiana, que desconta amostras pequenas",
@@ -1004,14 +1029,14 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
                margin: 20px 0 4px; }}
   .quicknav a {{ color:{BLUE}; text-decoration:none; }}
   .quicknav a:hover {{ text-decoration:underline; }}
-  #sidenav {{ position:fixed; left:18px; top:50%; transform:translateY(-50%);
-              z-index:15; display:none; flex-direction:column; gap:6px;
+  #sidenav {{ position:fixed; left:26px; top:50%; transform:translateY(-50%);
+              z-index:15; display:none; flex-direction:column;
               max-width:180px; }}
   @media (min-width: 1400px) {{ #sidenav {{ display:flex; }} }}
-  #sidenav a {{ background:{CARD}; color:{MUTED}; border:1px solid #2c3440;
-                border-radius:10px; padding:7px 12px; font-size:.8rem;
+  #sidenav a {{ color:{MUTED}; border-left:2px solid #2c3440;
+                padding:6px 0 6px 12px; font-size:.8rem; line-height:1.25;
                 text-decoration:none; transition:.15s; }}
-  #sidenav a:hover {{ color:{TEXT}; border-color:{GREEN}; }}
+  #sidenav a:hover {{ color:{TEXT}; border-left-color:{GREEN}; }}
   #totop {{ position:fixed; right:22px; bottom:22px; z-index:20;
             background:{CARD}; color:{TEXT}; border:1px solid #2c3440;
             border-radius:50%; width:44px; height:44px; font-size:1.2rem;
