@@ -47,3 +47,13 @@ def test_filter_year(export_dir):
     assert len(f) == 1 and len(d) == 1
     with pytest.raises(ingest.ExportError):
         ingest.filter_year(films, diary, 1990)
+
+
+def test_parse_dates_iso_and_brazilian():
+    import pandas as pd
+
+    iso = ingest.parse_dates(pd.Series(["2022-01-09", "2022-12-31"]))
+    assert iso.dt.month.tolist() == [1, 12]
+    br = ingest.parse_dates(pd.Series(["09/01/2022", "31/12/2022"]))
+    assert br.dt.month.tolist() == [1, 12]  # DD/MM, não MM/DD
+    assert br.dt.day.tolist() == [9, 31]

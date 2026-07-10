@@ -8,11 +8,24 @@ from pathlib import Path
 
 import pandas as pd
 
-WANTED = ["diary", "watched", "ratings", "watchlist", "reviews", "profile"]
+WANTED = ["diary", "watched", "ratings", "watchlist", "reviews", "profile",
+          "comments"]
 
 
 class ExportError(Exception):
     """Export inválido ou incompleto."""
+
+
+def parse_dates(s: pd.Series) -> pd.Series:
+    """Datas do export: ISO (AAAA-MM-DD) ou pt-BR (DD/MM/AAAA).
+
+    O export oficial usa ISO, mas arquivos que passaram pelo Excel podem
+    vir em DD/MM/AAAA; detectamos pelo que parseia melhor.
+    """
+    iso = pd.to_datetime(s, format="%Y-%m-%d", errors="coerce")
+    if iso.notna().mean() >= 0.5:
+        return iso
+    return pd.to_datetime(s, dayfirst=True, errors="coerce")
 
 
 def read_export(path: Path) -> dict[str, pd.DataFrame]:
@@ -67,7 +80,7 @@ def build_diary(frames: dict[str, pd.DataFrame]) -> pd.DataFrame | None:
         return None
 
     d = diary.copy()
-    d["Watched Date"] = pd.to_datetime(d["Watched Date"], errors="coerce")
+    d["Watched Date"] = parse_dates(d["Watched Date"])
     d = d.dropna(subset=["Watched Date"])
     d["Year"] = pd.to_numeric(d["Year"], errors="coerce").astype("Int64")
     if "Rewatch" in d:

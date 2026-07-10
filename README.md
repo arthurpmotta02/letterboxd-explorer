@@ -112,6 +112,18 @@ CI no GitHub Actions roda lint e testes em Python 3.10 e 3.12. Os testes usam fi
 
 **Busca com fallback.** O ano do Letterboxd às vezes diverge do TMDB (festival × lançamento comercial); a busca tenta com o ano e repete sem ele. Filme não encontrado não quebra o relatório.
 
+## Tratamento de dados ausentes
+
+**Filmes sem nota.** O Letterboxd só permite notas de 0.5★ a 5★ (não existe "nota zero"). Filmes assistidos sem nota entram em todas as contagens (volume, horas, gêneros, países, décadas...), mas são excluídos de qualquer análise de avaliação — sem imputação, o que evita distorcer médias e distribuições.
+
+**Filmes sem correspondência no TMDB.** Ficam de fora apenas das análises enriquecidas (gêneros, diretores, mapa...); o relatório informa no cabeçalho quantos foram enriquecidos.
+
+**Filmes com zero votos no TMDB.** Aparecem contabilizados no subtítulo de "Filmes menos conhecidos", mas fora das barras (uma barra de comprimento zero não comunica nada).
+
+**Diário escasso.** Se você marca filmes como vistos mas raramente registra no diário, as análises temporais e as abas por ano usam as datas do `watched.csv` (dia em que o filme foi marcado), descartando dias de importação em massa; as seções afetadas indicam isso no subtítulo.
+
+**Datas.** O parser aceita tanto o formato ISO do export oficial (AAAA-MM-DD) quanto DD/MM/AAAA (arquivos que passaram pelo Excel), detectando automaticamente.
+
 ## Licença
 
 MIT. Dados de filmes pelo [TMDB](https://www.themoviedb.org); este produto usa a API do TMDB mas não é endossado ou certificado pelo TMDB. Sem afiliação com o Letterboxd.

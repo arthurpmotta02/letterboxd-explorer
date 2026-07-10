@@ -1,6 +1,7 @@
-"""Cliente TMDB com cache em disco, retry e suporte a chave v3 / token v4.
+"""Cliente TMDB com cache em disco, retry, requisições paralelas e
+suporte a chave v3 / token v4.
 
-O export do Letterboxd traz só título, ano, nota e data — todo o resto
+O export do Letterboxd traz só título, ano, nota e data. Todo o resto
 (gêneros, diretores, países, keywords...) vem daqui.
 """
 
@@ -8,7 +9,9 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -16,16 +19,28 @@ import requests
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 DEFAULT_CACHE = Path("tmdb_cache.json")
+WORKERS = 8  # requisições em paralelo (limite do TMDB é ~50/s)
 
 
 class TmdbClient:
     def __init__(self, key: str):
-        self.session = requests.Session()
-        if key and len(key) > 40:  # Read Access Token (v4)
-            self.session.headers["Authorization"] = f"Bearer {key}"
-            self.base_params: dict = {}
-        else:  # API key (v3)
-            self.base_params = {"api_key": key}
+        self._key = key
+        self._is_v4 = bool(key) and len(key) > 40
+        self._local = threading.local()  # uma Session por thread
+
+    @property
+    def session(self) -> requests.Session:
+        s = getattr(self._local, "s", None)
+        if s is None:
+            s = requests.Session()
+            if self._is_v4:
+                s.headers["Authorization"] = f"Bearer {self._key}"
+            self._local.s = s
+        return s
+
+    @property
+    def base_params(self) -> dict:
+        return {} if self._is_v4 else {"api_key": self._key}
 
     def _get(self, path: str, **params) -> dict:
         for attempt in range(3):
@@ -97,7 +112,11 @@ def enrich(
     offline: bool = False,
     cache_path: Path = DEFAULT_CACHE,
 ) -> pd.DataFrame:
-    """Anexa metadados TMDB a cada filme, usando/alimentando o cache local."""
+    """Anexa metadados TMDB a cada filme, usando/alimentando o cache local.
+
+    As consultas rodam em paralelo (WORKERS threads); o cache é salvo
+    periodicamente, então interromper no meio não perde progresso.
+    """
     cache = load_cache(cache_path)
     missing = [
         (r.Name, r.Year) for r in films.itertuples() if f"{r.Name}|{r.Year}" not in cache
@@ -110,13 +129,22 @@ def enrich(
                 "Use --tmdb-key, defina TMDB_API_KEY, ou rode com --offline."
             )
         client = TmdbClient(key)
-        print(f"Buscando {len(missing)} filmes no TMDB ({len(cache)} já em cache)...")
-        for i, (name, year) in enumerate(missing, 1):
-            cache[f"{name}|{year}"] = client.fetch_movie(name, year)
-            if i % 25 == 0 or i == len(missing):
-                print(f"  {i}/{len(missing)}")
-                save_cache(cache, cache_path)
-            time.sleep(0.05)  # ~20 req/s, abaixo do limite do TMDB
+        print(f"Buscando {len(missing)} filmes no TMDB "
+              f"({len(cache)} já em cache, {WORKERS} requisições em paralelo)...")
+        done = 0
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            futures = {pool.submit(client.fetch_movie, n, y): (n, y) for n, y in missing}
+            for fut in as_completed(futures):
+                n, y = futures[fut]
+                try:
+                    cache[f"{n}|{y}"] = fut.result()
+                except Exception as e:  # nunca deixa uma falha derrubar o lote
+                    print(f"  ! erro em '{n}': {e}", file=sys.stderr)
+                    cache[f"{n}|{y}"] = None
+                done += 1
+                if done % 50 == 0 or done == len(missing):
+                    print(f"  {done}/{len(missing)}")
+                    save_cache(cache, cache_path)
         save_cache(cache, cache_path)
     elif missing:
         print(

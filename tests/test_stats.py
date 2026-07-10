@@ -91,9 +91,10 @@ def test_rating_by_runtime(films):
     assert rr["count"].sum() == 3  # A, B, D têm nota e duração
 
 
-def test_hall_of_fame(films):
-    hof = stats.hall_of_fame(films, top=2)
-    assert list(hof["Name"]) == ["A", "D"]  # 5.0 depois 4.0
+def test_personal_favorites(films):
+    pf = stats.personal_favorites(films, min_rating=3.0)
+    # diff: A = 5.0-4.4 = 0.6 ; D = 4.0-2.5 = 1.5 ; B = 3.5-3.0 = 0.5
+    assert list(pf["Name"]) == ["D", "A", "B"]
 
 
 def test_budget_buckets_empty(films):
@@ -108,3 +109,30 @@ def test_hipster_and_nostalgia_none_on_small(films):
 def test_genre_month(films, diary):
     gm = stats.genre_month(diary, films)
     assert (gm.sum(axis=1).round(6) == 1).all()
+
+
+def test_director_stats(films):
+    ds = stats.director_stats(films, min_count=2, top=10)
+    assert list(ds.index) == ["X"] and ds.loc["X", "n"] == 3
+
+
+def test_review_words_and_longest():
+    reviews = pd.DataFrame({
+        "Name": ["A", "B"],
+        "Review": ["cinema lindo cinema poesia", "cinema brutal e visceral demais"],
+    })
+    w = stats.review_words(reviews)
+    assert w.index[0] == "cinema" and w.iloc[0] == 3
+    name, n = stats.longest_review(reviews)
+    assert name == "B" and n == 5
+
+
+def test_watchlist_oldest_and_growth():
+    wl = pd.DataFrame({
+        "Name": ["X", "Y"], "Year": [2000, 2010],
+        "AddedDate": pd.to_datetime(["2022-01-09", "2024-06-01"]),
+    })
+    old = stats.watchlist_oldest(wl, today="2026-01-09", top=5)
+    assert old.iloc[0]["Name"] == "X" and old.iloc[0]["dias"] == 1461
+    g = stats.watchlist_growth(wl)
+    assert g.iloc[-1] == 2

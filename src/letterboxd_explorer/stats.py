@@ -93,6 +93,7 @@ def genre_trend(diary: pd.DataFrame, films: pd.DataFrame, top_n: int = 6) -> pd.
         films[["Name", "Year", "genres"]], on=["Name", "Year"], how="left"
     )
     merged = merged.dropna(subset=["genres"]).explode("genres")
+    merged = merged.reset_index(drop=True)  # explode duplica índices (pandas 3.x)
     if merged.empty:
         return pd.DataFrame()
     top = merged["genres"].value_counts().head(top_n).index
@@ -106,3 +107,180 @@ def watch_gap(films: pd.DataFrame, diary: pd.DataFrame) -> pd.Series:
     merged = diary.dropna(subset=["Year"]).copy()
     gap = merged["Watched Date"].dt.year - merged["Year"].astype(int)
     return gap[gap >= 0]
+
+
+def weekly_calendar(diary: pd.DataFrame) -> pd.DataFrame:
+    """Filmes por (ano, semana ISO), para o calendário de atividade."""
+    iso = diary["Watched Date"].dt.isocalendar()
+    ct = pd.crosstab(iso["year"], iso["week"])
+    return ct.reindex(columns=range(1, 54), fill_value=0)
+
+
+def cumulative_films(diary: pd.DataFrame) -> pd.Series:
+    """Total acumulado de registros no diário ao longo do tempo."""
+    return diary.sort_values("Watched Date").groupby("Watched Date").size().cumsum()
+
+
+def genre_month(diary: pd.DataFrame, films: pd.DataFrame, top_n: int = 8) -> pd.DataFrame:
+    """Sazonalidade: distribuição de cada gênero pelos meses (linha soma 1)."""
+    if "genres" not in films:
+        return pd.DataFrame()
+    merged = diary.merge(films[["Name", "Year", "genres"]], on=["Name", "Year"], how="left")
+    merged = merged.dropna(subset=["genres"]).explode("genres")
+    merged = merged.reset_index(drop=True)  # explode duplica índices (pandas 3.x)
+    if merged.empty:
+        return pd.DataFrame()
+    top = merged["genres"].value_counts().head(top_n).index
+    merged = merged[merged["genres"].isin(top)]
+    ct = pd.crosstab(merged["genres"], merged["Watched Date"].dt.month)
+    ct = ct.reindex(columns=range(1, 13), fill_value=0)
+    return ct.div(ct.sum(axis=1), axis=0)
+
+
+def rating_by_decade(films: pd.DataFrame, min_count: int = 5) -> pd.DataFrame:
+    """Sua nota média por década de lançamento (viés de nostalgia)."""
+    rated = films.dropna(subset=["Rating"])
+    rated = rated[rated["Year"].notna()]
+    if rated.empty:
+        return pd.DataFrame(columns=["mean", "count"])
+    dec = rated["Year"].astype(int).floordiv(10).mul(10)
+    g = rated.groupby(dec)["Rating"].agg(["mean", "count"])
+    return g[g["count"] >= min_count]
+
+
+def rating_by_runtime(films: pd.DataFrame, min_count: int = 5) -> pd.DataFrame:
+    """Nota média por faixa de duração."""
+    if "runtime" not in films:
+        return pd.DataFrame(columns=["mean", "count"])
+    rated = films.dropna(subset=["Rating", "runtime"])
+    rated = rated[rated["runtime"] > 0]
+    if rated.empty:
+        return pd.DataFrame(columns=["mean", "count"])
+    bins = [0, 90, 120, 150, 180, float("inf")]
+    labels = ["até 90 min", "90 a 120", "120 a 150", "150 a 180", "mais de 180"]
+    faixa = pd.cut(rated["runtime"], bins=bins, labels=labels)
+    g = rated.groupby(faixa, observed=False)["Rating"].agg(["mean", "count"])
+    return g[g["count"] >= min_count]
+
+
+def personal_favorites(films: pd.DataFrame, top: int = 10,
+                       min_rating: float = 4.5) -> pd.DataFrame:
+    """Entre suas maiores notas, os filmes mais distantes da nota TMDB.
+
+    Ranquear os 5 estrelas entre si não faz sentido (empate). O que é
+    informativo é: dos filmes que você ama, quais o resto do mundo avalia
+    bem abaixo de você — os favoritos que são genuinamente seus.
+    """
+    rated = films.dropna(subset=["Rating"])
+    rated = rated[rated["Rating"] >= min_rating]
+    if "tmdb_rating" not in films or rated.empty:
+        return rated.head(0)
+    rated = rated.dropna(subset=["tmdb_rating"]).copy()
+    rated["diff"] = rated["Rating"] - rated["tmdb_rating"] / 2
+    return rated.sort_values("diff", ascending=False).head(top)
+
+
+def budget_buckets(films: pd.DataFrame) -> pd.Series:
+    """Quantos filmes por faixa de orçamento de produção."""
+    if "budget" not in films:
+        return pd.Series(dtype=int)
+    b = pd.to_numeric(films["budget"], errors="coerce").fillna(0)
+    b = b[b > 0]
+    if b.empty:
+        return pd.Series(dtype=int)
+    bins = [0, 1e6, 20e6, 100e6, float("inf")]
+    labels = ["indie (< $1M)", "médio ($1M a $20M)",
+              "grande ($20M a $100M)", "blockbuster (> $100M)"]
+    return pd.cut(b, bins=bins, labels=labels).value_counts().reindex(labels, fill_value=0)
+
+
+def hipster_index(films: pd.DataFrame, vote_cut: int = 1000) -> float | None:
+    """Fração dos seus filmes com poucos votos no TMDB."""
+    if "tmdb_votes" not in films:
+        return None
+    v = films["tmdb_votes"].dropna()
+    if len(v) < 20:
+        return None
+    return float((v < vote_cut).mean())
+
+
+def nostalgia_gap(films: pd.DataFrame) -> float | None:
+    """Diferença de nota média: filmes pré-1980 menos filmes pós-2000."""
+    rated = films.dropna(subset=["Rating"])
+    rated = rated[rated["Year"].notna()]
+    old = rated[rated["Year"].astype(int) < 1980]["Rating"]
+    new = rated[rated["Year"].astype(int) >= 2000]["Rating"]
+    if len(old) >= 5 and len(new) >= 5:
+        return float(old.mean() - new.mean())
+    return None
+
+
+def director_stats(films: pd.DataFrame, min_count: int = 3, top: int = 25) -> pd.DataFrame:
+    """Por diretor: quantos filmes você viu e sua nota média (para scatter)."""
+    if "directors" not in films:
+        return pd.DataFrame(columns=["n", "nota"])
+    ds = films.explode("directors").dropna(subset=["directors"])
+    agg = ds.groupby("directors").agg(n=("Name", "count"), nota=("Rating", "mean"))
+    agg = agg.dropna(subset=["nota"])
+    return agg[agg["n"] >= min_count].nlargest(top, "n")
+
+
+STOPWORDS = {
+    # pt
+    "que", "não", "nao", "com", "uma", "por", "para", "mais", "the", "and",
+    "dos", "das", "ele", "ela", "isso", "esse", "essa", "este", "esta",
+    "mas", "como", "muito", "bem", "ser", "tem", "foi", "era", "são", "sao",
+    "você", "voce", "seu", "sua", "meu", "minha", "nos", "nós", "até", "ate",
+    "quando", "porque", "sobre", "depois", "ainda", "coisa", "filme", "filmes",
+    "aqui", "todo", "toda", "todos", "todas", "só", "las", "los", "des", "num",
+    "numa", "pra", "pro", "vai", "ver", "assistir", "assisti", "ficou", "fica",
+    # en
+    "this", "that", "with", "for", "was", "are", "but", "not", "you", "his",
+    "her", "have", "has", "one", "all", "its", "movie", "film", "just",
+    "like", "really", "very", "what", "when", "there", "they", "out", "about",
+    "from", "would", "been", "were", "more", "some", "can", "much", "get",
+}
+
+
+def review_words(reviews: pd.DataFrame, top: int = 25) -> pd.Series:
+    """Palavras mais frequentes nas suas resenhas (sem stopwords pt/en)."""
+    import re
+
+    if reviews is None or "Review" not in reviews:
+        return pd.Series(dtype=int)
+    text = " ".join(reviews["Review"].dropna().astype(str)).lower()
+    words = re.findall(r"[a-zà-üá-ú]{3,}", text)
+    words = [w for w in words if w not in STOPWORDS]
+    if not words:
+        return pd.Series(dtype=int)
+    return pd.Series(words).value_counts().head(top)
+
+
+def longest_review(reviews: pd.DataFrame):
+    """(nome do filme, nº de palavras) da resenha mais longa."""
+    if reviews is None or "Review" not in reviews:
+        return None
+    r = reviews.dropna(subset=["Review"]).copy()
+    if r.empty:
+        return None
+    r["_w"] = r["Review"].astype(str).str.split().str.len()
+    best = r.loc[r["_w"].idxmax()]
+    return str(best["Name"]), int(best["_w"])
+
+
+def watchlist_growth(watchlist: pd.DataFrame) -> pd.Series:
+    """Crescimento acumulado da watchlist (por data de adição)."""
+    if watchlist is None or "AddedDate" not in watchlist:
+        return pd.Series(dtype=int)
+    w = watchlist.dropna(subset=["AddedDate"])
+    return w.sort_values("AddedDate").groupby("AddedDate").size().cumsum()
+
+
+def watchlist_oldest(watchlist: pd.DataFrame, today=None, top: int = 10) -> pd.DataFrame:
+    """Filmes há mais tempo esperando na watchlist (dias desde a adição)."""
+    if watchlist is None or "AddedDate" not in watchlist:
+        return pd.DataFrame()
+    today = pd.Timestamp(today) if today else pd.Timestamp.now().normalize()
+    w = watchlist.dropna(subset=["AddedDate"]).copy()
+    w["dias"] = (today - w["AddedDate"]).dt.days
+    return w.nlargest(top, "dias")[["Name", "Year", "dias"]]
