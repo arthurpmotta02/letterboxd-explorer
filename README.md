@@ -1,6 +1,24 @@
 # letterboxd-explorer
 
+[![CI](https://github.com/arthurpmotta02/letterboxd-explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/arthurpmotta02/letterboxd-explorer/actions)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+
+> Análise exploratória completa do seu histórico do Letterboxd em um relatório HTML interativo de arquivo único.
+
 Você entrega o export oficial da sua conta do Letterboxd e recebe um **relatório HTML interativo em arquivo único**: abre em qualquer navegador, dá para mandar por WhatsApp. O export do Letterboxd traz só título, ano, nota e data; gêneros, diretores, elenco, países, duração e keywords são enriquecidos pela [API do TMDB](https://developer.themoviedb.org/) com cache local.
+
+## Sumário
+
+* [Demonstração](#demonstração)
+* [O que o relatório mostra](#o-que-o-relatório-mostra)
+* [Instalação](#instalação)
+* [Como usar](#como-usar)
+* [Arquitetura](#arquitetura)
+* [Privacidade](#privacidade)
+* [Desenvolvimento](#desenvolvimento)
+* [Decisões técnicas](#decisões-técnicas)
+* [Licença](#licença)
 
 ## Demonstração
 
@@ -194,7 +212,7 @@ A [API oficial do Letterboxd](https://letterboxd.com/api-beta/) é liberada apen
 
 **Filmes sem nota.** O Letterboxd só permite notas de 0.5★ a 5★ (não existe "nota zero"). Filmes assistidos sem nota entram em todas as contagens (volume, horas, gêneros, países, décadas...), mas são excluídos de qualquer análise de avaliação: sem imputação, o que evita distorcer médias e distribuições.
 
-**Filmes sem correspondência no TMDB.** Ficam de fora apenas das análises enriquecidas (gêneros, diretores, mapa...); o relatório informa no cabeçalho quantos foram enriquecidos. A busca inclui títulos adultos (sem `include_adult`, eles nunca seriam encontrados e sumiriam de todas as análises). Se você rodou uma versão antiga, use `--retry-misses` uma vez para rebuscá-los.
+**Filmes sem correspondência no TMDB.** Ficam de fora apenas das análises enriquecidas (gêneros, diretores, mapa...); o relatório informa no cabeçalho quantos foram enriquecidos. A busca é configurada para cobertura máxima do histórico, sem filtrar nenhuma categoria de título. Se você rodou uma versão antiga, use `--retry-misses` uma vez para rebuscar filmes que ficaram sem correspondência.
 
 **Filmes com zero votos no TMDB.** Aparecem contabilizados no subtítulo de "Filmes menos conhecidos", mas fora das barras (uma barra de comprimento zero não comunica nada).
 
