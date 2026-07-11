@@ -56,6 +56,14 @@ def generate(films: pd.DataFrame, diary: pd.DataFrame | None,
         adj = "mais generoso" if gen > 0 else "mais exigente"
         out.append(f"Você é <b>{abs(gen):.2f}★ {adj}</b> que a média do TMDB.")
 
+    outl = stats.taste_outlier_share(films)
+    if outl is not None:
+        out.append(
+            f"Em <b>{outl['outlier_share']:.0%}</b> dos filmes sua opinião "
+            "padronizada destoa da do TMDB em mais de 1 desvio: seu grau "
+            "de \"fora da curva\"."
+        )
+
     hip = stats.hipster_index(films)
     if hip is not None and hip >= 0.15:
         out.append(
@@ -81,7 +89,8 @@ def generate(films: pd.DataFrame, diary: pd.DataFrame | None,
         hi, lo, d = contrast
         out.append(
             f"Você avalia <b>{hi}</b> {d:.1f}★ acima de <b>{lo}</b> "
-            "(mín. 10 filmes por gênero)."
+            "(médias marginais, mín. 10 filmes; o efeito isolado está "
+            "no modelo do gosto)."
         )
 
     dec = stats.decade_counts(films)

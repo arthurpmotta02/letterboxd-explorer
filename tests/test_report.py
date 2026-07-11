@@ -25,6 +25,29 @@ def test_insights_no_diary(films):
     assert isinstance(facts, list)
 
 
+def test_report_structural_snapshot(films, diary, tmp_path):
+    """Snapshot estrutural: elementos de layout que não podem sumir."""
+    out = tmp_path / "r.html"
+    report.build_report(films, diary, {}, out)
+    html = out.read_text(encoding="utf-8")
+    for marker in ["sidenav", "totop", "sharecard", "downloadCard",
+                   "class=\"cards\"", "IntersectionObserver", "showTab"]:
+        assert marker in html, f"sumiu do template: {marker}"
+
+
+def test_report_schema_error_is_clear(tmp_path):
+    import pandas as pd
+
+    from letterboxd_explorer import ingest
+
+    pd.DataFrame({"Filme": ["A"]}).to_csv(tmp_path / "watched.csv", index=False)
+    try:
+        ingest.read_export(tmp_path)
+        raise AssertionError("deveria ter levantado ExportError")
+    except ingest.ExportError as e:
+        assert "watched.csv" in str(e)
+
+
 def test_iso_map_covers_africa():
     from letterboxd_explorer.report import ISO2_TO_ISO3
 

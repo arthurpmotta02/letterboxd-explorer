@@ -10,15 +10,27 @@ Você entrega o export oficial da sua conta do Letterboxd e recebe um **relatór
 
 ## Sumário
 
+* [Proposta](#proposta)
 * [Demonstração](#demonstração)
 * [O que o relatório mostra](#o-que-o-relatório-mostra)
 * [Instalação](#instalação)
 * [Como usar](#como-usar)
 * [Arquitetura](#arquitetura)
+* [Metodologia](#metodologia)
 * [Privacidade](#privacidade)
 * [Desenvolvimento](#desenvolvimento)
 * [Decisões técnicas](#decisões-técnicas)
 * [Licença](#licença)
+
+## Proposta
+
+O Letterboxd mostra *o que* você assistiu; este projeto tenta explicar *como você assiste* — e prever o que vem a seguir. A proposta tem três camadas:
+
+1. **Retrato descritivo**: volume, ritmo, calendário, gêneros, décadas, países, pessoas — o "Wrapped" completo do seu histórico, navegável e bonito, em um único HTML que abre em qualquer lugar.
+2. **Inferência honesta**: em vez de comparar médias cruas (que confundem gosto com composição do acervo), um modelo estatístico isola o efeito de cada característica na sua nota, toda média vem com intervalo de confiança, e afirmações como "terror em outubro" passam por teste de hipótese antes de virar frase.
+3. **Predição acionável**: o mesmo modelo treinado nas suas notas ordena a sua watchlist pela nota que você provavelmente daria — o relatório termina respondendo "o que eu assisto agora?".
+
+Tudo a partir de dois insumos apenas: o export oficial do Letterboxd (título, ano, nota, data) e a API pública do TMDB (gêneros, elenco, países, duração, votos), com cache local e sem enviar seus dados para lugar nenhum.
 
 ## Demonstração
 
@@ -28,11 +40,14 @@ Você entrega o export oficial da sua conta do Letterboxd e recebe um **relatór
 
 | | |
 |---|---|
+| ![Modelo do gosto: efeitos parciais](docs/figs/modelo_do_gosto.png) | ![Anatomia do seu 5 estrelas](docs/figs/anatomia_5_estrelas.png) |
+| ![Nota por gênero com incerteza](docs/figs/nota_genero_incerteza.png) | ![Generosidade real ao longo do tempo](docs/figs/generosidade_real.png) |
+| ![Arquétipos do gosto](docs/figs/arquetipos_gosto.png) | ![Exploração × explotação](docs/figs/exploracao_explotacao.png) |
 | ![Sua nota × TMDB](docs/figs/voce_vs_tmdb.png) | ![Distribuição das notas](docs/figs/distribuicao_notas.png) |
-| ![Notas por gênero](docs/figs/boxplot_generos.png) | ![Perfil por gênero](docs/figs/perfil_por_genero.png) |
+| ![Sazonalidade testada](docs/figs/sazonalidade_generos.png) | ![Mainstream ↔ cult](docs/figs/mainstream_cult.png) |
 | ![Diretores: volume, avaliação e consistência](docs/figs/diretores_volume_avaliacao.png) | ![Rede de colaborações](docs/figs/rede_colaboracoes.png) |
 | ![Lançamento × visualização](docs/figs/lancamento_x_visualizacao.png) | ![Popularidade × avaliação](docs/figs/popularidade_x_avaliacao.png) |
-| ![Evolução dos gêneros](docs/figs/evolucao_generos.png) | ![Sazonalidade dos gêneros](docs/figs/sazonalidade_generos.png) |
+| ![Evolução dos gêneros](docs/figs/evolucao_generos.png) | ![Sentimento das resenhas × nota](docs/figs/sentimento_resenhas.png) |
 
 ![Mapa de países](docs/figs/mapa_paises.png)
 
@@ -49,6 +64,21 @@ O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), 
 * **Insights automáticos** (estilo Wrapped): seu dia da semana de cinema, maior maratona de dias seguidos, recorde de filmes em um dia, filme-conforto, defasagem média até assistir, nota mais comum, generosidade vs. TMDB, coeficiente cult (% de filmes pouco votados), saudosismo (pré-1980 vs. pós-2000), contraste entre gêneros ("você avalia Drama 0.8 acima de Ação"), contagem de curtas, resenhas e comentários.
 * **Perfil por gênero**: radar com o volume relativo dos seus 8 gêneros mais vistos.
 
+### Modelo do gosto (novo na v3)
+
+* **O que de fato eleva a sua nota**: forest plot dos efeitos parciais de um modelo ridge (gênero, década, diretor, duração, popularidade), com IC de 95%. Cada efeito é controlado pelos demais — é o "bônus de Drama" isolado, não a média marginal.
+* **Anatomia do seu 5★**: importância de cada família de características (queda de R² ao removê-la).
+* **Generosidade real ao longo do tempo**: resíduo do modelo por ano — sua generosidade descontado o efeito de "escolher filmes melhores".
+* **Watchlist rankeada pelo seu gosto**: a nota que o modelo prevê que *você* daria a cada filme da watchlist. O "o que assistir a seguir" treinado no seu histórico.
+* **Arquétipos do seu gosto**: k-means sobre gênero+década+idioma+keywords, projetado em 2D, com rótulos interpretáveis, tamanho e nota média por grupo.
+
+### Exploração e nicho (novo na v3)
+
+* **Exploração × explotação**: entropia de gêneros por ano + taxa de diretores/países inéditos — seu repertório está se abrindo ou se fechando?
+* **Mainstream ↔ cult**: obscuridade média por ano (votos TMDB), com IC — seu gosto está migrando para o nicho?
+* **Retenção de diretores**: quantos te fisgaram (3+ filmes) vs. experimentos de uma vez só.
+* **Direção feminina ao longo do tempo** (campo `gender` do TMDB, com cobertura sinalizada).
+
 ### Linha do tempo
 
 * **Volume mensal** com média móvel de 3 meses para suavizar picos de maratona.
@@ -59,8 +89,9 @@ O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), 
 
 * **Distribuição das notas** com linha de média.
 * **Evolução da nota média** por ano (você está ficando mais generoso?).
-* **Sua nota × nota TMDB**: scatter com histogramas marginais e cor pela divergência.
-* **Maiores divergências**: barras divergentes (o que você defende e o que não perdoa).
+* **Sua nota × nota TMDB**: scatter com histogramas marginais e cor pela divergência, com calibração honesta — Spearman separa "régua diferente" de "gosto diferente".
+* **Maiores divergências**: barras divergentes azul↔laranja, seguras para daltônicos (o que você defende e o que não perdoa).
+* **Nota por gênero com incerteza**: encolhimento bayesiano + IC de 95% em todas as agregações por grupo.
 * **Favoritos mais pessoais**: grade de pôsteres dos seus 4.5/5 estrelas mais distantes da nota TMDB (mínimo de 30 votos, para excluir médias sem lastro).
 * **Melhor avaliado por gênero**: pôster campeão de cada gênero, com selo.
 * **Joias escondidas**: nota alta sua em filmes que pouca gente viu.
@@ -71,7 +102,7 @@ O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), 
 * **Décadas de lançamento** (contagem) e **avaliação por década** (bolhas proporcionais).
 * **Defasagem lançamento → visualização** com curva de densidade.
 * **Lançamento × visualização**: scatter que revela suas fases ("2023 foi meu ano de mergulhar nos anos 70"), colorido pela nota.
-* **Gêneros**: contagem, **boxplot de notas por gênero**, **evolução ano a ano** (área empilhada) e **sazonalidade** (terror em outubro?).
+* **Gêneros**: contagem, **boxplot de notas por gênero**, **evolução ano a ano** (área empilhada) e **sazonalidade testada** — heatmap de observado/esperado com teste χ² ("outubro tem 2.3× mais terror, p < 0.01"), não só impressão visual.
 * **Keywords (microgêneros)** do TMDB: slow burn, neo-noir, coming of age...
 * **Duração**: distribuição com KDE e avaliação por faixa, incluindo curtas (≤40 min).
 * **Orçamento de produção**, **raridades do acervo** (pôsteres dos menos votados, com contagem dos zero-votos) e **rewatches mais frequentes**.
@@ -79,7 +110,8 @@ O HTML é organizado em blocos, com abas por ano no topo (Tudo, 2026, 2025...), 
 ### Watchlist e resenhas
 
 * **Crescimento da watchlist** e **filmes há mais tempo esperando**.
-* **Vocabulário das resenhas**: palavras mais frequentes, sem stopwords.
+* **O que você escreve × a nota que você dá**: sentimento léxico (heurístico pt/en) de cada resenha contra a estrela — você elogia com estrelas e reclama com palavras?
+* **Suas palavras-assinatura**: termos frequentes E espalhados por muitas resenhas (uma resenha longa não domina o ranking).
 
 ### Pessoas e lugares
 
@@ -119,7 +151,7 @@ pip install .
 
 ## Como usar
 
-1. **Exporte seus dados**: em [letterboxd.com](https://letterboxd.com), vá em Settings > Data > **Export your data**. Mova o ZIP baixado para a pasta do projeto (não precisa extrair).
+1. **Exporte seus dados**: em [letterboxd.com](https://letterboxd.com), vá em Settings > Data > **Export your data**. Mova o ZIP baixado para a pasta do projeto (não precisa extrair). *Atenção: o export completo pode exigir assinatura Pro; contas free têm acesso limitado ao recurso — verifique na sua conta.*
 2. **Crie uma chave gratuita do TMDB**: conta em [themoviedb.org/signup](https://www.themoviedb.org/signup), depois Settings > API > Create. Copie a **API Key**.
 3. **Rode** (com o venv ativado):
 
@@ -169,12 +201,37 @@ flowchart LR
 ```
 src/letterboxd_explorer/
 ├── cli.py        # linha de comando
-├── ingest.py     # leitura do export (ZIP ou pasta)
-├── tmdb.py       # cliente TMDB: cache, retry, rate limit, chave v3 ou token v4
+├── ingest.py     # leitura do export (ZIP ou pasta) + validação de schema
+├── tmdb.py       # cliente TMDB: cache versionado, retry, rate limit, v3/v4
 ├── stats.py      # análises puras sobre DataFrames (testáveis, sem I/O)
+├── models.py     # modelagem: ridge, k-means, PCA (numpy puro, sem I/O)
 ├── insights.py   # frases-insight automáticas
 └── report.py     # figuras Plotly e template HTML
 ```
+
+## Metodologia
+
+Três princípios guiam todas as análises: **mostrar incerteza** (média sem intervalo de confiança em amostra pequena é ruído travestido de insight), **separar gosto de composição** ("você gosta mais de Drama" pode ser só "você viu mais Drama bom") e **curadoria** (o essencial abre expandido; o secundário colapsa em "mais análises").
+
+### O modelo da nota (ridge)
+
+A peça central da v3 é uma regressão ridge com a sua nota como resposta e, como preditores, dummies de gênero, década de lançamento, diretores recorrentes, idioma e ano em que você assistiu, mais duração e popularidade (log de votos TMDB) como variáveis contínuas. Três propriedades importam aqui. Primeiro, os coeficientes são **efeitos parciais**: o "bônus de Drama" é estimado controlando por década, diretor e tudo o mais — o que também resolve o problema de um filme com N gêneros contar N vezes nas médias marginais. Segundo, a penalização do ridge **encolhe amostras pequenas** na direção de zero, cumprindo o papel de um prior bayesiano: um diretor com 3 filmes não ganha um efeito gigante por sorte. Terceiro, o mesmo modelo é reaproveitado três vezes: os coeficientes viram o forest plot, a queda de R² ao remover cada família de features vira a "anatomia do seu 5★", e a predição sobre a watchlist vira o ranking "o que assistir a seguir". Os intervalos exibidos são ICs de 95% aproximados (Var(β) = σ²·A⁻¹XᵀX·A⁻¹, A = XᵀX + αI).
+
+### Generosidade sem viés de seleção
+
+A curva ingênua de "nota média por ano" sobe tanto se você ficou generoso quanto se aprendeu a escolher filmes melhores. A versão da v3 usa o **resíduo do modelo** (nota observada menos nota prevista pelas características do filme, sem os dummies de ano): o que sobra é a sua generosidade de fato, ano a ano, com IC.
+
+### Incerteza e testes em tudo
+
+Médias por grupo (gêneros, décadas) recebem **encolhimento bayesiano** — score = (n·média + m·média_global)/(n + m) — e IC de 95%; onde as barras se sobrepõem, o relatório diz que a diferença não é conclusiva. A sazonalidade gênero × mês é um **χ² de independência** com heatmap de observado/esperado ("2.3× o baseline"), não uma leitura visual. A mudança de ritmo no volume mensal é um **changepoint por segmentação binária** validado com teste t de Welch. Rewatch × primeira sessão idem. Na comparação com o TMDB, **Spearman sobre notas padronizadas** separa "minha régua é mais dura" (offset) de "meu ranking discorda" (correlação) — escalas 0.5–5 e 0–10 não são comparáveis por subtração direta.
+
+### Watchlist, clusters e texto
+
+A watchlist é enriquecida no TMDB e pontuada pelo modelo — a predição nunca usa os dummies de "ano em que viu" (não se prevê o passado). Os **arquétipos de gosto** vêm de k-means (init k-means++) sobre gênero+década+idioma+keywords padronizados, projetados em 2D por PCA, com rótulos automáticos extraídos das features que mais distinguem cada cluster. Nas resenhas, o **sentimento é léxico** (listas pt/en compactas, sinalizado como heurístico) e as **palavras-assinatura** ponderam frequência × espalhamento (tf·log(1+df)), para que uma resenha longa não domine o ranking.
+
+### O que o dado não permite
+
+O honesto também é dizer o que ficou de fora: curva de sobrevivência da watchlist (o export não traz data de adição dos filmes que *saíram* da lista — viés de censura por construção), e o campo `gender` do TMDB é incompleto e binário-centrado (a seção de direção feminina exibe a cobertura do dado e pede leitura como aproximação).
 
 ## Privacidade
 
@@ -199,6 +256,12 @@ CI no GitHub Actions roda lint e testes em Python 3.10 e 3.12. Os testes usam fi
 **Análises desacopladas da renderização.** `stats.py` só transforma DataFrames, o que permite testar cada análise isoladamente e trocar o front-end sem reescrever a lógica.
 
 **Busca com fallback.** O ano do Letterboxd às vezes diverge do TMDB (festival × lançamento comercial); a busca tenta com o ano e repete sem ele. Filme não encontrado não quebra o relatório.
+
+**Modelos em numpy puro.** O modelo da nota, a watchlist prevista e os clusters usam ridge regression e k-means implementados à mão (~100 linhas), evitando a dependência pesada de scikit-learn. O encolhimento do ridge cumpre o papel de prior bayesiano nas amostras pequenas de diretor/gênero.
+
+**Incerteza em tudo.** Toda média por grupo (gênero, década, diretor) aparece com encolhimento bayesiano e IC de 95%; sazonalidade tem teste χ²; a mudança de ritmo tem p-valor. Ponto sem incerteza em amostra pequena é ruído travestido de insight.
+
+**Sistema de cor com significado.** Verde de marca = volume/contagem; laranja = suas notas; uma única escala divergente azul↔laranja (segura para daltônicos) reservada para "acima/abaixo do esperado"; sequencial única para intensidade; categórica inspirada em Okabe–Ito para gêneros/clusters.
 
 ## Por que TMDB e não a API do Letterboxd?
 

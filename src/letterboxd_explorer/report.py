@@ -10,20 +10,34 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from letterboxd_explorer import insights, stats
+from letterboxd_explorer import insights, models, stats
 from letterboxd_explorer.ingest import parse_dates
 
 # ------------------------------------------------------------------- tema
 
 BG, CARD, TEXT, MUTED = "#14181c", "#1b2228", "#dfe7ef", "#99aabb"
 GRID = "#242c34"
+
+# ------- sistema de cor com significado (D1) -------
+# volume/contagem = verde de marca; notas suas = laranja; neutro = azul.
 ORANGE, GREEN, BLUE = "#ff8000", "#00e054", "#40bcf4"
-PURPLE, PINK, YELLOW, RED = "#9b5de5", "#f15bb5", "#f4d35e", "#ff5c5c"
-PALETTE = [GREEN, ORANGE, BLUE, YELLOW, "#ee6c4d", PURPLE,
-           "#00bbf9", PINK, "#8ac926", RED]
+# divergência ("acima/abaixo do esperado"): azul ↔ laranja, seguro para
+# daltônicos — usada SÓ em você×TMDB e desvios vs. baseline.
+DIV_POS, DIV_NEG, DIV_MID = "#ffb000", "#57a8e8", "#39424d"
+DIV_SCALE = [[0, DIV_NEG], [0.5, DIV_MID], [1, DIV_POS]]
+# escala sequencial única para intensidade (calendário, heatmaps)
+SEQ_SCALE = [[0, "#20262c"], [0.01, "#0e4429"], [0.4, "#26a641"],
+             [1, "#39d353"]]
+# categórica inspirada em Okabe–Ito (clara p/ fundo escuro): gêneros,
+# clusters, idiomas — categorias distintas em vez de tons de verde.
+CAT = ["#56b4e9", "#e69f00", "#00c48f", "#f0e442", "#cc79a7",
+       "#ff7043", "#9fd356", "#b39ddb"]
+PALETTE = CAT
+PURPLE, PINK, YELLOW, RED = "#b39ddb", "#cc79a7", "#f0e442", DIV_NEG
 GRAD = {
     GREEN: "#0e4429", ORANGE: "#5c2e00", BLUE: "#0f3a52",
     PURPLE: "#2e1b4d", PINK: "#4d1230", YELLOW: "#4d3f00",
+    DIV_POS: "#4d3300", DIV_NEG: "#173a56",
 }
 PT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
              "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
@@ -166,11 +180,20 @@ SAVE_FIGS = {
     "Popularidade × avaliação": "popularidade_x_avaliacao",
     "Distribuição das notas por gênero": "boxplot_generos",
     "Evolução dos gêneros": "evolucao_generos",
-    "Sazonalidade dos gêneros": "sazonalidade_generos",
+    "Sazonalidade dos gêneros, testada": "sazonalidade_generos",
     "Keywords (microgêneros)": "keywords_microgeneros",
     "Diretores: volume × avaliação × consistência": "diretores_volume_avaliacao",
     "Rede de colaborações diretor–ator": "rede_colaboracoes",
     "Países de produção": "mapa_paises",
+    # v3: modelo do gosto e novas séries
+    "O que de fato eleva a sua nota": "modelo_do_gosto",
+    "Anatomia do seu 5★": "anatomia_5_estrelas",
+    "Generosidade real ao longo do tempo": "generosidade_real",
+    "Arquétipos do seu gosto": "arquetipos_gosto",
+    "Nota por gênero, com incerteza": "nota_genero_incerteza",
+    "Exploração × explotação": "exploracao_explotacao",
+    "Mainstream ↔ cult ao longo do tempo": "mainstream_cult",
+    "O que você escreve × a nota que você dá": "sentimento_resenhas",
 }
 
 POSTER_BASE = "https://image.tmdb.org/t/p/w185"
@@ -212,13 +235,13 @@ def _network_fig(pairs: pd.Series):
     for (d, a), w in pairs.items():
         fig.add_trace(go.Scatter(
             x=[0, 1], y=[yd[d], ya[a]], mode="lines",
-            line=dict(width=1 + w * 1.4, color="rgba(0,224,84,.28)"),
+            line=dict(width=1.5 + w * 1.6, color="rgba(0,224,84,.45)"),
             hoverinfo="skip", showlegend=False))
     fig.add_trace(go.Scatter(
         x=[0] * len(directors), y=[yd[d] for d in directors.index],
         mode="markers+text", text=list(directors.index),
         textposition="middle left", textfont=dict(size=11.5, color=TEXT),
-        marker=dict(size=directors.values / directors.max() * 18 + 9,
+        marker=dict(size=directors.values / directors.max() * 16 + 12,
                     color=ORANGE, line=dict(width=1.5, color=CARD)),
         customdata=directors.values,
         hovertemplate="%{text}: %{customdata} colaborações<extra></extra>",
@@ -227,7 +250,7 @@ def _network_fig(pairs: pd.Series):
         x=[1] * len(actors), y=[ya[a] for a in actors.index],
         mode="markers+text", text=list(actors.index),
         textposition="middle right", textfont=dict(size=11.5, color=TEXT),
-        marker=dict(size=actors.values / actors.max() * 18 + 9,
+        marker=dict(size=actors.values / actors.max() * 16 + 12,
                     color=BLUE, line=dict(width=1.5, color=CARD)),
         customdata=actors.values,
         hovertemplate="%{text}: %{customdata} colaborações<extra></extra>",
@@ -331,15 +354,15 @@ def _build_content(
     note: str = "",
     registry: dict | None = None,
 ):
-    sections: list[tuple[str, str, str, str]] = []
+    sections: list[tuple[str, str, str, str, bool]] = []
 
-    def add(grp, title, sub, fig, height=420):
+    def add(grp, title, sub, fig, height=420, secondary=False):
         if registry is not None and title in SAVE_FIGS:
             registry[SAVE_FIGS[title]] = (fig, height)
-        sections.append((grp, title, sub, _fig_html(fig, height)))
+        sections.append((grp, title, sub, _fig_html(fig, height), secondary))
 
-    def add_html(grp, title, sub, html):
-        sections.append((grp, title, sub, html))
+    def add_html(grp, title, sub, html, secondary=False):
+        sections.append((grp, title, sub, html, secondary))
 
     rated = films.dropna(subset=["Rating"])
     hours = films["runtime"].dropna().sum() / 60 if "runtime" in films else 0
@@ -376,11 +399,145 @@ def _build_content(
             hovertemplate="%{theta}<extra></extra>"))
         fig.update_layout(
             polar=dict(bgcolor=CARD,
-                       radialaxis=dict(visible=False, range=[0, 1.02]),
-                       angularaxis=dict(gridcolor=GRID, linecolor=GRID)),
+                       radialaxis=dict(range=[0, 1.02], showticklabels=False,
+                                       gridcolor=GRID, griddash="dot",
+                                       tickvals=[0.25, 0.5, 0.75, 1.0]),
+                       angularaxis=dict(gridcolor=GRID, linecolor=GRID,
+                                        tickfont=dict(size=12.5, color=TEXT))),
             showlegend=False, margin=dict(l=80, r=80, t=40, b=40))
-        add(G, "Perfil por gênero", "Volume relativo dos seus 8 gêneros mais vistos",
-            fig, 440)
+        add(G, "Perfil por gênero",
+            "Volume relativo dos seus 8 gêneros mais vistos; cada anel "
+            "pontilhado = 25% do gênero mais visto", fig, 440)
+
+    # ================================================== modelo do gosto
+    G = "Modelo do gosto"
+    model = models.rating_model(films, diary)
+    if model is not None and main:
+        eff = model["effects"]
+        fam_color = {f: CAT[i % len(CAT)]
+                     for i, f in enumerate(dict.fromkeys(eff["family"]))}
+        show = eff[eff["family"] != "ano em que viu"].copy()
+        show["abs"] = show["coef"].abs()
+        show = pd.concat([
+            show[show["family"] == fam].nlargest(6, "abs")
+            for fam in dict.fromkeys(show["family"])
+        ]).sort_values("coef")
+        fig = go.Figure()
+        for fam in dict.fromkeys(show["family"]):
+            e = show[show["family"] == fam]
+            fig.add_trace(go.Scatter(
+                x=e["coef"], y=e.index, mode="markers", name=fam,
+                error_x=dict(type="data", array=1.96 * e["se"],
+                             color="rgba(153,170,187,.5)", thickness=1.5,
+                             width=4),
+                marker=dict(size=10, color=fam_color[fam],
+                            line=dict(width=1.5, color=CARD)),
+                hovertemplate="%{y}: %{x:+.2f}★ (IC95 ±"
+                              "%{error_x.array:.2f})<extra></extra>"))
+        fig.add_vline(x=0, line_color=MUTED, line_dash="dot")
+        fig.update_layout(xaxis_title="efeito parcial na sua nota (★)",
+                          legend=dict(orientation="h", y=1.08),
+                          margin=dict(l=10))
+        fig.update_yaxes(gridcolor="rgba(0,0,0,0)", tickfont=dict(size=11.5))
+        add(G, "O que de fato eleva a sua nota",
+            f"Efeitos parciais de um modelo ridge sobre {model['n']} filmes "
+            f"avaliados (R² = {model['r2']:.0%}). Cada efeito é controlado "
+            "pelos demais: é o \"bônus\" da característica, não a média "
+            "marginal — e a barra é o IC de 95%.",
+            fig, max(420, 24 * len(show) + 140))
+
+        imp = model["importance"]
+        imp = imp[imp > 0.001]
+        if len(imp) >= 3:
+            fig = go.Figure(go.Bar(
+                x=imp.values[::-1], y=list(imp.index)[::-1], orientation="h",
+                marker=dict(color=[fam_color.get(f, BLUE)
+                                   for f in imp.index[::-1]], line_width=0),
+                hovertemplate="%{y}: %{x:.1%} do R²<extra></extra>"))
+            fig.update_layout(xaxis_title="queda de R² ao remover a família",
+                              xaxis_tickformat=".0%", bargap=0.4)
+            fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
+            add(G, "Anatomia do seu 5★",
+                "O que mais move a sua avaliação: quanto o modelo piora "
+                "quando cada família de características é removida.",
+                fig, 340)
+
+        rby = model["resid_by_year"]
+        if rby is not None:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=list(rby.index) + list(rby.index)[::-1],
+                y=list(rby["mean"] + rby["ci"])
+                + list((rby["mean"] - rby["ci"])[::-1]),
+                fill="toself", fillcolor="rgba(255,128,0,.12)",
+                line=dict(width=0), hoverinfo="skip", showlegend=False))
+            fig.add_trace(go.Scatter(
+                x=rby.index, y=rby["mean"], mode="lines+markers",
+                line=dict(color=ORANGE, width=2.5),
+                marker=dict(size=9, color=ORANGE,
+                            line=dict(width=2, color=CARD)),
+                customdata=rby["n"],
+                hovertemplate="%{x}: %{y:+.2f}★ (%{customdata} filmes)"
+                              "<extra></extra>", showlegend=False))
+            fig.add_hline(y=0, line_color=MUTED, line_dash="dot")
+            fig.update_layout(xaxis=dict(dtick=1, title="ano em que assistiu"),
+                              yaxis_title="generosidade além do esperado (★)")
+            add(G, "Generosidade real ao longo do tempo",
+                "Resíduo do modelo: sua nota menos a nota prevista pelas "
+                "características do filme. Acima de zero = você foi mais "
+                "generoso do que o seu padrão para aquele tipo de filme — "
+                "descontado o efeito de \"escolher melhor\".", fig, 380)
+
+    if main:
+        wl_enr = frames.get("watchlist_enriched")
+        ranked = models.rank_watchlist(films, wl_enr, diary, model=model) \
+            if model is not None and wl_enr is not None else None
+        if ranked is not None and len(ranked) >= 5:
+            sub = (f"As maiores notas que o modelo prevê que <i>você</i> "
+                   f"daria, entre {len(wl_enr)} filmes da watchlist "
+                   f"(incerteza típica ±{model['sigma']:.1f}★). "
+                   "É o \"o que assistir a seguir\" treinado no seu gosto.")
+            if "poster" in ranked and ranked["poster"].notna().sum() >= 5:
+                items = [dict(name=r.Name, year=r.Year, poster=r.poster,
+                              badge=f"{r.pred:.1f}★",
+                              lines=[f"prevista {r.pred:.1f}★"])
+                         for r in ranked.head(12).itertuples()]
+                add_html(G, "Watchlist rankeada pelo seu gosto", sub,
+                         _poster_grid(items))
+            else:
+                s = pd.Series(ranked["pred"].round(2).values,
+                              index=[f"{n} ({y})" for n, y in
+                                     zip(ranked["Name"], ranked["Year"])])
+                add(G, "Watchlist rankeada pelo seu gosto", sub,
+                    _hbar(s[::-1][-15:], ORANGE, unit="★ prevista"), 480)
+
+    if main:
+        cl = models.taste_clusters(films)
+        if cl is not None:
+            df, labels = cl["df"], cl["labels"]
+            summ = cl["summary"]
+            fig = go.Figure()
+            for j, lab in labels.items():
+                d = df[df["cluster"] == j]
+                extra = ""
+                if j in summ.index and pd.notna(summ.loc[j, "rating"]):
+                    extra = f" · {summ.loc[j, 'rating']:.2f}★"
+                fig.add_trace(go.Scatter(
+                    x=d["x"], y=d["y"], mode="markers",
+                    name=f"{lab} ({len(d)}{extra})",
+                    text=d["Name"],
+                    marker=dict(size=7, color=CAT[j % len(CAT)], opacity=.8,
+                                line_width=0),
+                    hovertemplate="%{text}<extra>" + lab + "</extra>"))
+            fig.update_layout(
+                xaxis=dict(visible=False), yaxis=dict(visible=False),
+                legend=dict(orientation="h", y=-0.06,
+                            font=dict(size=11.5)))
+            add(G, "Arquétipos do seu gosto",
+                "Filmes agrupados por gênero, década, idioma e keywords "
+                "(k-means; projeção 2D). O rótulo de cada grupo traz os "
+                "traços que mais o distinguem, com tamanho e nota média.",
+                fig, 520)
 
     # ================================================== linha do tempo
     G = "Linha do tempo"
@@ -399,11 +556,24 @@ def _build_content(
                     name="média móvel (3 meses)",
                     line=dict(color=TEXT, width=2.5),
                     hovertemplate="%{x|%b %Y}: %{y:.1f}<extra>média móvel</extra>"))
+            cp = stats.activity_changepoint(diary)
+            sub_cp = ""
+            if cp:
+                fig.add_vline(x=cp["date"], line_dash="dash",
+                              line_color=MUTED)
+                fig.add_annotation(x=cp["date"], y=1, yref="paper",
+                                   text="mudança de ritmo", showarrow=False,
+                                   font=dict(color=MUTED, size=11),
+                                   xanchor="left")
+                direc = "acelerou" if cp["after"] > cp["before"] else "desacelerou"
+                sub_cp = (f" · em {cp['date']:%b/%Y} seu ritmo {direc}: de "
+                          f"{cp['before']:.1f} para {cp['after']:.1f} "
+                          f"filmes/mês (p = {cp['p']:.3f})")
             fig.update_layout(yaxis_title="filmes por mês",
                               legend=dict(orientation="h", y=1.12))
             add(G, "Volume mensal",
-                f"Filmes por mês; a linha clara suaviza picos de maratona{note}",
-                fig, 370)
+                f"Filmes por mês; a linha clara suaviza picos de "
+                f"maratona{note}{sub_cp}", fig, 370)
 
         cal = stats.weekly_calendar(diary)
         if len(cal) and cal.values.sum() >= 20:
@@ -433,10 +603,11 @@ def _build_content(
             hm = hm.reindex(index=range(7), columns=range(1, 13), fill_value=0)
             fig = go.Figure(go.Heatmap(
                 z=hm.values, x=PT_MONTHS, y=PT_WEEKDAYS,
-                colorscale=[[0, "#20262c"], [.01, "#0e4429"], [1, "#39d353"]],
+                colorscale=SEQ_SCALE,
                 showscale=False, xgap=3, ygap=3,
                 hovertemplate="%{y}, %{x}: %{z} filmes<extra></extra>"))
-            add(G, "Padrão semanal e mensal", f"Dia da semana × mês{note}", fig, 340)
+            add(G, "Padrão semanal e mensal", f"Dia da semana × mês{note}",
+                fig, 340, secondary=True)
 
     # ================================================== suas notas
     G = "Suas notas"
@@ -472,29 +643,41 @@ def _build_content(
 
     her = stats.heresies(films)
     if len(her) >= 10:
+        cal = stats.calibration(films)
+        cal_sub = ("Acima da linha pontilhada = você avalia melhor que a "
+                   "média.")
+        if cal:
+            rho = cal["spearman"]
+            grau = ("concorda muito" if rho >= 0.6 else
+                    "concorda em parte" if rho >= 0.35 else "discorda")
+            cal_sub += (f" Separando régua de gosto: seu <i>ranking</i> "
+                        f"{grau} com o do TMDB (Spearman ρ = {rho:.2f}) e "
+                        f"sua régua é {abs(cal['offset']):.2f}★ "
+                        f"{'acima' if cal['offset'] > 0 else 'abaixo'} da "
+                        f"deles em média ({cal['n']} filmes, 30+ votos).")
         fig = px.scatter(
             her, x="tmdb_5", y="Rating", hover_name="Name",
-            color="diff", color_continuous_scale=[RED, "#5a6672", GREEN],
+            color="diff",
+            color_continuous_scale=[DIV_NEG, DIV_MID, DIV_POS],
             opacity=.75, marginal_x="histogram", marginal_y="histogram",
             labels={"tmdb_5": "nota TMDB (0 a 5)", "Rating": "sua nota"})
         fig.add_shape(type="line", x0=0, y0=0, x1=5, y1=5,
                       line=dict(color=MUTED, dash="dot"))
         fig.update_layout(coloraxis_showscale=False)
-        add(G, "Sua nota × nota TMDB",
-            "Acima da linha pontilhada = você avalia melhor que a média", fig, 520)
+        add(G, "Sua nota × nota TMDB", cal_sub, fig, 520)
 
         her10 = pd.concat([her.nlargest(6, "diff"),
                            her.nsmallest(6, "diff")]).sort_values("diff")
         fig = go.Figure(go.Bar(
             x=her10["diff"], y=her10["Name"], orientation="h",
-            marker=dict(color=[GREEN if d > 0 else RED for d in her10["diff"]],
-                        line_width=0),
+            marker=dict(color=[DIV_POS if d > 0 else DIV_NEG
+                               for d in her10["diff"]], line_width=0),
             hovertemplate="%{y}: %{x:+.1f}★ vs TMDB<extra></extra>"))
         fig.add_vline(x=0, line_color=MUTED)
         fig.update_layout(xaxis_title="sua nota − nota TMDB (★)", bargap=0.35)
         fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
         add(G, "Maiores divergências vs. TMDB",
-            "À direita: você avalia acima da média. À esquerda: abaixo.", fig, 440)
+            "Laranja: você avalia acima da média. Azul: abaixo.", fig, 440)
 
     pf = stats.personal_favorites(films)
     n_top = int((rated["Rating"] >= 4.5).sum()) if len(rated) else 0
@@ -567,8 +750,8 @@ def _build_content(
                 x=pop["tmdb_votes"], y=pop["Rating"], mode="markers",
                 text=pop["Name"],
                 marker=dict(size=7, color=pop["Rating"],
-                            colorscale=[[0, GRAD[PURPLE]], [1, GREEN]],
-                            showscale=False, opacity=.7, line_width=0),
+                            colorscale="Viridis",
+                            showscale=False, opacity=.6, line_width=0),
                 hovertemplate="%{text}: %{y}★, %{x} votos<extra></extra>"))
             trend = stats.binned_trend(np.log10(pop["tmdb_votes"]), pop["Rating"])
             if trend:
@@ -599,9 +782,13 @@ def _build_content(
 
     rd = stats.rating_by_decade(films)
     if len(rd) >= 3:
+        sigma = rated["Rating"].std() if len(rated) > 1 else 0.5
+        ci = 1.96 * sigma / np.sqrt(rd["count"] + 5)
         fig = go.Figure(go.Scatter(
             x=[str(d) for d in rd.index], y=rd["mean"], mode="lines+markers",
             line=dict(color=ORANGE, width=2.5),
+            error_y=dict(type="data", array=ci,
+                         color="rgba(153,170,187,.5)", thickness=1.5, width=4),
             marker=dict(size=(rd["count"] / rd["count"].max() * 22 + 8),
                         color=ORANGE, line=dict(width=2, color=CARD)),
             customdata=rd["count"],
@@ -609,14 +796,16 @@ def _build_content(
         fig.update_layout(xaxis_title="década de lançamento",
                           yaxis_title="sua nota média")
         add(G, "Avaliação por década de lançamento",
-            "Bolha maior = mais filmes avaliados naquela década", fig, 360)
+            "Bolha maior = mais filmes avaliados; a barra é o IC de 95% — "
+            "décadas com poucas notas têm médias pouco confiáveis", fig, 360)
 
     if has_diary:
         gap = stats.watch_gap(films, diary)
         if len(gap) >= 30:
-            fig = _hist_kde(gap, PURPLE, "anos entre lançamento e visualização")
+            fig = _hist_kde(gap, BLUE, "anos entre lançamento e visualização")
             add(G, "Defasagem lançamento → visualização",
-                f"Mediana de {gap.median():.0f} anos{note}", fig, 380)
+                f"Mediana de {gap.median():.0f} anos{note}", fig, 380,
+                secondary=True)
 
     if has_diary:
         rv = stats.release_vs_watch(films, diary)
@@ -636,8 +825,8 @@ def _build_content(
                     x=rv_r["release_year"], y=rv_r["watch_year"], mode="markers",
                     text=rv_r["Name"],
                     marker=dict(size=7, color=rv_r["Rating"], cmin=0.5, cmax=5,
-                                colorscale=[[0, RED], [.5, YELLOW], [1, GREEN]],
-                                opacity=.85, line_width=0,
+                                colorscale="Viridis",
+                                opacity=.8, line_width=0,
                                 colorbar=dict(title="nota", outlinewidth=0,
                                               tickfont=dict(color=TEXT))),
                     name="com nota",
@@ -673,7 +862,44 @@ def _build_content(
             fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
             add(G, "Distribuição das notas por gênero",
                 "Boxplot nos 8 gêneros mais vistos (traço central = mediana, "
-                "linha tracejada = média)", fig, 460)
+                "linha tracejada = média). Atenção: um filme com N gêneros "
+                "conta em N caixas — para o efeito <i>isolado</i> de cada "
+                "gênero, veja \"O que de fato eleva a sua nota\".",
+                fig, 460, secondary=True)
+
+        sg = stats.shrunk_group(films, "genres", min_count=5, top=12)
+        if len(sg) >= 4:
+            sg = sg.sort_values("bayes")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=sg["mean"], y=list(sg.index), mode="markers",
+                name="média crua",
+                marker=dict(size=7, color=MUTED, symbol="circle-open",
+                            line=dict(width=1.5)),
+                hovertemplate="%{y}: %{x:.2f}★ crua<extra></extra>"))
+            fig.add_trace(go.Scatter(
+                x=sg["bayes"], y=list(sg.index), mode="markers",
+                name="média ajustada",
+                error_x=dict(type="data", array=sg["ci"],
+                             color="rgba(153,170,187,.5)", thickness=1.5,
+                             width=4),
+                marker=dict(size=11, color=ORANGE,
+                            line=dict(width=1.5, color=CARD)),
+                customdata=sg["n"],
+                hovertemplate="%{y}: %{x:.2f}★ ± %{error_x.array:.2f} "
+                              "(%{customdata} filmes)<extra></extra>"))
+            prior = rated["Rating"].mean()
+            fig.add_vline(x=prior, line_dash="dot", line_color=MUTED,
+                          annotation_text=f"sua média {prior:.2f}",
+                          annotation_font_color=MUTED)
+            fig.update_layout(xaxis_title="sua nota média (★)",
+                              legend=dict(orientation="h", y=1.08))
+            fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
+            add(G, "Nota por gênero, com incerteza",
+                "Média com encolhimento bayesiano (amostras pequenas são "
+                "puxadas para a sua média global) e IC de 95%. Onde as "
+                "barras se sobrepõem, a diferença entre gêneros não é "
+                "conclusiva.", fig, 440)
 
     if has_diary:
         trend = stats.genre_trend(diary, films)
@@ -690,20 +916,46 @@ def _build_content(
             add(G, "Evolução dos gêneros",
                 f"Participação dos gêneros mais vistos, ano a ano{note}", fig, 460)
 
-        gm = stats.genre_month(diary, films)
-        if len(gm) >= 3 and len(diary) >= 60:
+        seas = stats.seasonality_test(diary, films)
+        if seas is not None:
+            lift = seas["lift"]
             fig = go.Figure(go.Heatmap(
-                z=gm.values, x=PT_MONTHS, y=list(gm.index),
-                colorscale=[[0, "#20262c"], [1, ORANGE]], showscale=False,
+                z=lift.values, x=PT_MONTHS, y=list(lift.index),
+                colorscale=DIV_SCALE, zmid=1,
+                zmin=0, zmax=max(2.0, float(np.nanmax(lift.values))),
                 xgap=3, ygap=3,
-                hovertemplate="%{y} em %{x}: %{z:.0%}<extra></extra>"))
-            add(G, "Sazonalidade dos gêneros",
-                "Distribuição de cada gênero ao longo do ano "
-                "(cada linha soma 100%)", fig, 380)
+                colorbar=dict(title="obs./esp.", outlinewidth=0,
+                              tickfont=dict(color=TEXT)),
+                hovertemplate="%{y} em %{x}: %{z:.1f}× o esperado"
+                              "<extra></extra>"))
+            pico = lift.stack()
+            (pg, pm), pv = pico.idxmax(), pico.max()
+            sig = ("A associação gênero × mês é estatisticamente "
+                   f"significativa (χ², p = {seas['p']:.3f})"
+                   if seas["p"] < 0.05 else
+                   "O teste χ² NÃO confirma sazonalidade além do acaso "
+                   f"(p = {seas['p']:.2f})")
+            add(G, "Sazonalidade dos gêneros, testada",
+                f"Laranja = mais que o esperado para o mês; azul = menos. "
+                f"Pico: {pg} em {PT_MONTHS[pm - 1]} ({pv:.1f}× o baseline). "
+                f"{sig} · n = {seas['n']}.", fig, 400)
+        else:
+            gm = stats.genre_month(diary, films)
+            if len(gm) >= 3 and len(diary) >= 60:
+                fig = go.Figure(go.Heatmap(
+                    z=gm.values, x=PT_MONTHS, y=list(gm.index),
+                    colorscale=SEQ_SCALE, showscale=False,
+                    xgap=3, ygap=3,
+                    hovertemplate="%{y} em %{x}: %{z:.0%}<extra></extra>"))
+                add(G, "Sazonalidade dos gêneros",
+                    "Distribuição de cada gênero ao longo do ano "
+                    "(cada linha soma 100%) · amostra pequena para teste χ²",
+                    fig, 380)
 
     k = stats.explode_count(films, "keywords", 25)
     if len(k):
-        add(G, "Keywords (microgêneros)", "Fonte: TMDB", _hbar(k, BLUE), 620)
+        add(G, "Keywords (microgêneros)", "Fonte: TMDB", _hbar(k, GREEN), 620,
+            secondary=True)
 
     if "runtime" in films:
         rt = films["runtime"].dropna()
@@ -714,7 +966,7 @@ def _build_content(
             add(G, "Distribuição de duração",
                 f"Mediana {rt.median():.0f} min · mais longo: "
                 f"<b>{longest['Name']}</b> ({int(longest['runtime'])} min)",
-                fig, 380)
+                fig, 380, secondary=True)
 
     rr = stats.rating_by_runtime(films)
     if len(rr) >= 3:
@@ -728,18 +980,19 @@ def _build_content(
                                 min(5, rr["mean"].max() + .3)])
         fig.update_layout(xaxis_title="duração", yaxis_title="nota média")
         add(G, "Avaliação por faixa de duração",
-            "Mín. 5 filmes avaliados por faixa", fig, 360)
+            "Mín. 5 filmes avaliados por faixa · para o efeito controlado "
+            "da duração, veja o modelo do gosto", fig, 360, secondary=True)
 
     bb = stats.budget_buckets(films)
     if len(bb) and bb.sum() >= 20:
         fig = go.Figure(go.Bar(
             x=[str(i) for i in bb.index], y=bb.values,
             marker=dict(color=list(bb.values),
-                        colorscale=[[0, GRAD[YELLOW]], [1, YELLOW]], line_width=0),
+                        colorscale=[[0, GRAD[GREEN]], [1, GREEN]], line_width=0),
             hovertemplate="%{x}: %{y} filmes<extra></extra>"))
         fig.update_layout(yaxis_title="filmes")
         add(G, "Distribuição por orçamento de produção",
-            "Quando informado no TMDB", fig, 360)
+            "Quando informado no TMDB", fig, 360, secondary=True)
 
     if ("tmdb_votes" in films and "poster" in films
             and films["tmdb_votes"].notna().any()):
@@ -761,8 +1014,128 @@ def _build_content(
     if has_diary:
         rw = stats.most_rewatched(diary)
         if len(rw) >= 3:
-            add(G, "Rewatches mais frequentes", "Entradas repetidas no diário",
-                _hbar(rw, PINK, unit="vezes"), 380)
+            rw_sub = "Entradas repetidas no diário"
+            rwe = stats.rewatch_effect(diary)
+            if rwe:
+                comp = ("acima das" if rwe["rewatch_mean"] > rwe["first_mean"]
+                        else "abaixo das")
+                conf = ("diferença significativa"
+                        if rwe["p"] < 0.05 else "diferença não conclusiva")
+                rw_sub += (f" · você dá {rwe['rewatch_mean']:.2f}★ em "
+                           f"rewatches, {comp} primeiras sessões "
+                           f"({rwe['first_mean']:.2f}★) — {conf} "
+                           f"(p = {rwe['p']:.2f})")
+            add(G, "Rewatches mais frequentes", rw_sub,
+                _hbar(rw, GREEN, unit="vezes"), 380, secondary=True)
+
+    # ================================================== exploração e nicho
+    if has_diary:
+        G = "Exploração e nicho"
+        exp = stats.exploration_by_year(diary, films)
+        if len(exp) >= 3 and "entropy" in exp:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=exp.index, y=exp["entropy"], mode="lines+markers",
+                name="variedade de gêneros (entropia)",
+                line=dict(color=CAT[0], width=2.5),
+                marker=dict(size=8, line=dict(width=2, color=CARD)),
+                hovertemplate="%{x}: %{y:.0%}<extra>variedade</extra>"))
+            for col, nm, ci in (("novel_directors", "diretores inéditos", 1),
+                                ("novel_countries", "países inéditos", 2)):
+                if col in exp and exp[col].notna().any():
+                    fig.add_trace(go.Scatter(
+                        x=exp.index, y=exp[col], mode="lines+markers",
+                        name=nm, line=dict(color=CAT[ci], width=2,
+                                           dash="dot"),
+                        marker=dict(size=7, line=dict(width=2, color=CARD)),
+                        hovertemplate="%{x}: %{y:.0%}<extra>" + nm +
+                                      "</extra>"))
+            fig.update_layout(yaxis_tickformat=".0%",
+                              yaxis=dict(range=[0, 1.05],
+                                         title="quanto do máximo possível"),
+                              xaxis=dict(dtick=1),
+                              legend=dict(orientation="h", y=1.12))
+            tese = ""
+            if len(exp) >= 2:
+                d_ent = exp["entropy"].iloc[-1] - exp["entropy"].iloc[0]
+                tese = ("Seu repertório está " +
+                        ("se abrindo" if d_ent > 0.03 else
+                         "se fechando" if d_ent < -0.03 else "estável") +
+                        ". ")
+            add(G, "Exploração × explotação",
+                f"{tese}Entropia = variedade de gêneros no ano (100% = "
+                "todos por igual); linhas pontilhadas = % de diretores/"
+                "países vistos pela primeira vez.", fig, 420)
+
+        obs = stats.obscurity_by_year(diary, films)
+        if len(obs) >= 3:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=list(obs.index) + list(obs.index)[::-1],
+                y=list(obs["mean"] + obs["ci"])
+                + list((obs["mean"] - obs["ci"])[::-1]),
+                fill="toself", fillcolor="rgba(0,224,84,.10)",
+                line=dict(width=0), hoverinfo="skip", showlegend=False))
+            fig.add_trace(go.Scatter(
+                x=obs.index, y=obs["mean"], mode="lines+markers",
+                line=dict(color=GREEN, width=2.5),
+                marker=dict(size=8, color=GREEN,
+                            line=dict(width=2, color=CARD)),
+                customdata=obs["n"],
+                hovertemplate="%{x}: %{y:.2f} (%{customdata} filmes)"
+                              "<extra></extra>", showlegend=False))
+            rumo = ("rumo ao nicho"
+                    if obs["mean"].iloc[-1] > obs["mean"].iloc[0]
+                    else "rumo ao mainstream")
+            fig.update_layout(xaxis=dict(dtick=1),
+                              yaxis_title="obscuridade média "
+                                          "(−log₁₀ votos TMDB)")
+            add(G, "Mainstream ↔ cult ao longo do tempo",
+                f"Seu gosto está migrando {rumo}. Quanto mais alto, menos "
+                "votados no TMDB são os filmes daquele ano; a faixa é o IC "
+                "de 95%.", fig, 380)
+
+        ret = stats.director_retention(films)
+        if ret is not None and len(ret) >= 3:
+            hooked = stats.hooked_directors(films, diary)
+            n1 = int(ret.loc[1, "diretores"]) if 1 in ret.index else 0
+            n3 = int(ret[ret.index >= 3]["diretores"].sum())
+            fig = go.Figure(go.Bar(
+                x=[str(i) for i in ret.index], y=ret["diretores"],
+                marker=dict(color=list(ret["diretores"]),
+                            colorscale=[[0, GRAD[GREEN]], [1, GREEN]],
+                            line_width=0),
+                hovertemplate="%{y} diretores com %{x} filme(s)"
+                              "<extra></extra>"))
+            fig.update_layout(xaxis_title="filmes vistos do diretor",
+                              yaxis_title="diretores", yaxis_type="log")
+            top_h = (", ".join(hooked.head(3).index)
+                     if hooked is not None and len(hooked) else "")
+            add(G, "Quem te fisgou: retenção de diretores",
+                f"De {n1} diretores experimentados uma única vez, "
+                f"{n3} chegaram a 3+ filmes (te fisgaram de verdade"
+                f"{': ' + top_h if top_h else ''}). Escala log.",
+                fig, 380, secondary=True)
+
+        gr = stats.gender_representation(films, diary)
+        if gr is not None and len(gr) >= 3:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=gr.index, y=gr["pct_fem"], mode="lines+markers",
+                line=dict(color=CAT[4], width=2.5),
+                marker=dict(size=9, color=CAT[4],
+                            line=dict(width=2, color=CARD)),
+                customdata=np.stack([gr["fem"], gr["known"]], axis=-1),
+                hovertemplate="%{x}: %{y:.0%} (%{customdata[0]}/"
+                              "%{customdata[1]})<extra></extra>",
+                showlegend=False))
+            fig.update_layout(yaxis_tickformat=".0%", xaxis=dict(dtick=1),
+                              yaxis_title="% com direção feminina")
+            cov = gr["coverage"].mean()
+            add(G, "Direção feminina ao longo do tempo",
+                f"Entre os filmes com dado de gênero no TMDB (cobertura "
+                f"média {cov:.0%}; o campo é incompleto e binário-"
+                "centrado — leia como aproximação).", fig, 380)
 
     # ================================================== watchlist e resenhas
     if main:
@@ -775,8 +1148,8 @@ def _build_content(
             if len(growth) >= 10:
                 fig = go.Figure(go.Scatter(
                     x=growth.index, y=growth.values, mode="lines",
-                    line=dict(color=YELLOW, width=2.5),
-                    fill="tozeroy", fillcolor="rgba(244,211,94,.10)",
+                    line=dict(color=GREEN, width=2.5),
+                    fill="tozeroy", fillcolor="rgba(0,224,84,.10)",
                     hovertemplate="%{x|%d/%m/%Y}: %{y} filmes<extra></extra>"))
                 fig.update_layout(yaxis_title="filmes na watchlist")
                 add(G, "Crescimento da watchlist",
@@ -790,15 +1163,49 @@ def _build_content(
                                      zip(old["Name"], old["Year"])])
                 add(G, "Mais antigos na watchlist",
                     "Dias desde que você adicionou e ainda não assistiu",
-                    _hbar(s[::-1], YELLOW, unit="dias"), 400)
+                    _hbar(s[::-1], BLUE, unit="dias"), 400, secondary=True)
 
         reviews = frames.get("reviews")
         if reviews is not None and "Review" in reviews:
-            words = stats.review_words(reviews)
-            if len(words) >= 10:
-                add(G, "Vocabulário das resenhas",
-                    f"Palavras mais frequentes nas suas {len(reviews)} resenhas "
-                    "(sem stopwords)", _hbar(words, PINK, unit="ocorrências"), 620)
+            sent = stats.review_sentiment(reviews, films)
+            if sent is not None and len(sent) >= 12:
+                from scipy import stats as sps
+
+                rho_s, p_s = sps.spearmanr(sent["Rating"], sent["score"])
+                rng = np.random.default_rng(3)
+                jit = rng.uniform(-0.08, 0.08, len(sent))
+                fig = go.Figure(go.Scatter(
+                    x=sent["Rating"] + jit, y=sent["score"], mode="markers",
+                    text=sent["Name"],
+                    marker=dict(size=8, color=sent["score"], cmin=-1, cmax=1,
+                                colorscale=DIV_SCALE, opacity=.8,
+                                line_width=0),
+                    hovertemplate="%{text}: nota %{x:.1f}★, tom %{y:.2f}"
+                                  "<extra></extra>"))
+                fig.add_hline(y=0, line_color=MUTED, line_dash="dot")
+                fig.update_layout(
+                    xaxis=dict(title="sua nota (★)", dtick=0.5),
+                    yaxis=dict(title="tom do texto (− crítico · + elogioso)",
+                               range=[-1.15, 1.15]))
+                acordo = ("acompanha" if rho_s >= 0.35 else
+                          "acompanha pouco" if rho_s >= 0.15 else
+                          "quase não acompanha")
+                add(G, "O que você escreve × a nota que você dá",
+                    f"Sentimento léxico (heurístico, pt/en) de cada resenha "
+                    f"contra a estrela. Seu texto {acordo} sua nota "
+                    f"(ρ = {rho_s:.2f}). Pontos abaixo de zero com nota "
+                    "alta = elogia com as estrelas, reclama com as palavras.",
+                    fig, 440)
+
+            sig = stats.signature_words(reviews)
+            if sig is not None and len(sig) >= 8:
+                s = pd.Series(sig["tf"].values, index=sig.index)
+                add(G, "Suas palavras-assinatura",
+                    f"Frequentes E espalhadas por muitas das suas "
+                    f"{int(reviews['Review'].notna().sum())} resenhas — uma "
+                    "resenha longa sozinha não domina o ranking.",
+                    _hbar(s[::-1], BLUE, unit="ocorrências"), 560,
+                    secondary=True)
 
     # ================================================== pessoas e lugares
     G = "Pessoas e lugares"
@@ -817,7 +1224,7 @@ def _build_content(
             customdata=np.stack([ds["std"], ds["bayes"]], axis=-1),
             marker=dict(size=ds["n"] / ds["n"].max() * 26 + 10,
                         color=ds["bayes"], cmin=max(0, ds["bayes"].min() - .3),
-                        colorscale=[[0, GRAD[ORANGE]], [1, GREEN]],
+                        colorscale="Viridis",
                         showscale=False, line=dict(width=1.5, color=CARD)),
             hovertemplate=("%{hovertext}: %{x} filmes, %{y:.2f}★ ± "
                            "%{customdata[0]:.2f}<br>média bayesiana "
@@ -836,7 +1243,8 @@ def _build_content(
     a = stats.explode_count(films, "cast", 15)
     if len(a):
         add(G, "Atores e atrizes mais frequentes",
-            "Top 8 créditos de cada filme", _hbar(a, BLUE), 480)
+            "Top 8 créditos de cada filme", _hbar(a, GREEN), 480,
+            secondary=True)
 
     pairs = stats.collaboration_edges(films)
     if len(pairs) >= 5:
@@ -891,13 +1299,19 @@ def _build_content(
             fig.update_layout(showlegend=False,
                               annotations=[dict(text="idiomas", showarrow=False,
                                                 font=dict(color=MUTED, size=15))])
-            add(G, "Idiomas originais", "", fig, 430)
+            add(G, "Idiomas originais", "", fig, 430, secondary=True)
 
     facts = insights.generate(films, diary, frames)
     return cards, facts, sections
 
 
 # ------------------------------------------------------------------ template
+
+
+def _section_html(title, sub, body) -> str:
+    sub_html = f'<p class="sub">{sub}</p>' if sub else ""
+    return (f'<section><h2>{title}</h2>{sub_html}'
+            f'<div class="plot">{body}</div></section>\n')
 
 
 def _render_tab(cards, facts, sections, idx: int = 0) -> str:
@@ -915,16 +1329,33 @@ def _render_tab(cards, facts, sections, idx: int = 0) -> str:
         links = " · ".join(f'<a href="#t{idx}-g{k}">{g}</a>'
                            for k, g in enumerate(groups))
         nav = f'<div class="quicknav">Ir para: {links}</div>'
+
+    # curadoria (D2): o essencial abre expandido; o secundário de cada
+    # bloco vai para um <details> "mais análises"
     secs = ""
     current_group = None
-    for grp, title, sub, body in sections:
+    extra_buf: list[str] = []
+
+    def _flush_extras():
+        nonlocal secs, extra_buf
+        if extra_buf:
+            secs += ('<details class="more"><summary>mais análises '
+                     f'({len(extra_buf)})</summary>'
+                     + "".join(extra_buf) + "</details>\n")
+            extra_buf = []
+
+    for grp, title, sub, body, secondary in sections:
         if grp != current_group:
+            _flush_extras()
             k = groups.index(grp)
             secs += f'<div class="group" id="t{idx}-g{k}"><span>{grp}</span></div>\n'
             current_group = grp
-        sub_html = f'<p class="sub">{sub}</p>' if sub else ""
-        secs += (f'<section><h2>{title}</h2>{sub_html}'
-                 f'<div class="plot">{body}</div></section>\n')
+        piece = _section_html(title, sub, body)
+        if secondary:
+            extra_buf.append(piece)
+        else:
+            secs += piece
+    _flush_extras()
     return f'<div class="cards">{cards_html}</div>\n{nav}\n{facts_html}\n{secs}'
 
 
@@ -960,6 +1391,42 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
                 f"com <b>{top_d.index[0]}</b> como presença mais constante e "
                 f'nota média de <b>{rated_all["Rating"].mean():.2f}★</b>.</p>')
 
+    # ------- card compartilhável 9:16 (D4) -------
+    hours_all = films["runtime"].dropna().sum() / 60 if "runtime" in films else 0
+    fav_img = ""
+    pf = stats.personal_favorites(films, top=1)
+    if len(pf) and "poster" in pf and pd.notna(pf["poster"].iloc[0]):
+        fav_img = (f'<img class="scposter" '
+                   f'src="{POSTER_BASE}{pf["poster"].iloc[0]}" alt="">'
+                   f'<div class="sclbl">favorito mais seu: '
+                   f'{pf["Name"].iloc[0]}</div>')
+    share_rows = "".join(
+        f'<div class="scrow"><div class="scbig">{v}</div>'
+        f'<div class="sclbl">{lb}</div></div>'
+        for v, lb in [
+            (f"{len(films):,}".replace(",", "."), "filmes"),
+            (f"{hours_all:,.0f} h".replace(",", "."), "de tela"),
+            (f'{rated_all["Rating"].mean():.2f} ★' if len(rated_all) else "—",
+             "nota média"),
+            (top_g.index[0] if len(top_g) else "—", "gênero nº 1"),
+            (top_d.index[0] if len(top_d) else "—", "diretor da vida"),
+        ])
+    share_html = f"""
+<div id="shareoverlay" onclick="if(event.target===this)toggleShare(false)">
+  <div id="sharebox">
+    <div id="sharecard">
+      <div class="schead">🎬 {("@" + username) if username else title}</div>
+      {share_rows}
+      {fav_img}
+      <div class="scfoot">letterboxd-explorer</div>
+    </div>
+    <div class="scbtns">
+      <button onclick="downloadCard()">⬇ baixar PNG (9:16)</button>
+      <button onclick="toggleShare(false)">fechar</button>
+    </div>
+  </div>
+</div>"""
+
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -967,6 +1434,7 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root {{ color-scheme: dark; }}
   * {{ box-sizing: border-box; }}
@@ -1046,6 +1514,38 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
             cursor:pointer; opacity:0; pointer-events:none; transition:.2s; }}
   #totop.show {{ opacity:.92; pointer-events:auto; }}
   #totop:hover {{ border-color:{GREEN}; }}
+  #sidenav a.active {{ color:{GREEN}; border-left-color:{GREEN};
+                       font-weight:600; }}
+  details.more {{ margin-top:28px; }}
+  details.more > summary {{ cursor:pointer; color:{MUTED}; font-size:.9rem;
+    padding:10px 16px; background:{CARD}; border:1px dashed #2c3440;
+    border-radius:12px; user-select:none; transition:.15s; }}
+  details.more > summary:hover {{ color:{TEXT}; border-color:{GREEN}; }}
+  details.more[open] > summary {{ margin-bottom:6px; }}
+  #sharebtn {{ position:fixed; right:22px; bottom:76px; z-index:20;
+    background:{CARD}; color:{TEXT}; border:1px solid #2c3440;
+    border-radius:22px; padding:10px 16px; font-size:.9rem;
+    cursor:pointer; transition:.2s; }}
+  #sharebtn:hover {{ border-color:{GREEN}; }}
+  #shareoverlay {{ display:none; position:fixed; inset:0; z-index:40;
+    background:rgba(0,0,0,.72); align-items:center; justify-content:center; }}
+  #shareoverlay.open {{ display:flex; }}
+  #sharecard {{ width:324px; height:576px; background:
+    linear-gradient(160deg, #17242b 0%, {BG} 55%, #101b13 100%);
+    border:1px solid #2c3440; border-radius:18px; padding:28px 26px;
+    display:flex; flex-direction:column; justify-content:space-between; }}
+  .schead {{ font-size:1.05rem; font-weight:700; color:{TEXT}; }}
+  .scrow .scbig {{ font-size:1.5rem; font-weight:800; color:{GREEN};
+                   line-height:1.15; }}
+  .scrow .sclbl, .sclbl {{ color:{MUTED}; font-size:.78rem; }}
+  .scposter {{ width:96px; border-radius:8px; border:1px solid #2c3440;
+               margin-top:4px; }}
+  .scfoot {{ color:{MUTED}; font-size:.72rem; letter-spacing:.12em;
+             text-transform:uppercase; }}
+  .scbtns {{ display:flex; gap:10px; justify-content:center; margin-top:14px; }}
+  .scbtns button {{ background:{CARD}; color:{TEXT}; border:1px solid #2c3440;
+    border-radius:18px; padding:8px 16px; cursor:pointer; }}
+  .scbtns button:hover {{ border-color:{GREEN}; }}
 </style>
 </head>
 <body>
@@ -1064,10 +1564,13 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
 <nav id="sidenav" aria-label="atalhos"></nav>
 <button id="totop" title="voltar ao topo"
   onclick="window.scrollTo({{top:0, behavior:'smooth'}})">↑</button>
+<button id="sharebtn" onclick="toggleShare(true)">📤 card</button>
+{share_html}
 <script>
 window.addEventListener('scroll', function () {{
   document.getElementById('totop').classList.toggle('show', window.scrollY > 600);
 }});
+var spy = null;
 function buildSideNav(i) {{
   var nav = document.getElementById('sidenav');
   nav.innerHTML = '';
@@ -1079,14 +1582,25 @@ function buildSideNav(i) {{
     window.scrollTo({{top: 0, behavior: 'smooth'}});
   }};
   nav.appendChild(top);
+  if (spy) spy.disconnect();
+  spy = new IntersectionObserver(function (entries) {{
+    entries.forEach(function (en) {{
+      if (!en.isIntersecting) return;
+      nav.querySelectorAll('a').forEach(function (a) {{
+        a.classList.toggle('active',
+          a.getAttribute('href') === '#' + en.target.id);
+      }});
+    }});
+  }}, {{rootMargin: '-15% 0px -70% 0px'}});
   document.querySelectorAll('#tab-' + i + ' .group').forEach(function (g) {{
     var a = document.createElement('a');
     a.textContent = g.querySelector('span').textContent;
     a.href = '#' + g.id;
     nav.appendChild(a);
+    spy.observe(g);
   }});
 }}
-function showTab(i) {{
+function showTab(i, keepHash) {{
   document.querySelectorAll('.tabpane').forEach(function (el, j) {{
     el.style.display = (i === j) ? '' : 'none';
   }});
@@ -1094,9 +1608,35 @@ function showTab(i) {{
     b.classList.toggle('active', i === j);
   }});
   buildSideNav(i);
+  if (!keepHash) history.replaceState(null, '', '#aba-' + i);
   window.dispatchEvent(new Event('resize'));
 }}
-showTab(0);
+// estado da aba persiste na URL (#aba-N)
+var m = (location.hash || '').match(/^#aba-(\\d+)$/);
+showTab(m ? Math.min(+m[1],
+  document.querySelectorAll('.tabpane').length - 1) : 0, !m);
+// Plotly precisa de resize quando um <details> abre
+document.querySelectorAll('details.more').forEach(function (d) {{
+  d.addEventListener('toggle', function () {{
+    if (d.open) window.dispatchEvent(new Event('resize'));
+  }});
+}});
+function toggleShare(open) {{
+  document.getElementById('shareoverlay').classList.toggle('open', open);
+}}
+function downloadCard() {{
+  if (typeof html2canvas === 'undefined') {{
+    alert('Sem internet para carregar o gerador de imagem.'); return;
+  }}
+  html2canvas(document.getElementById('sharecard'),
+              {{scale: 3.33, backgroundColor: null, useCORS: true}})
+    .then(function (canvas) {{
+      var a = document.createElement('a');
+      a.download = 'letterboxd-card.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }});
+}}
 </script>
 </body>
 </html>"""

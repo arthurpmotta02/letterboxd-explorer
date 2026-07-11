@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "letterboxd-explorer"
-version = "2.2.0"
+version = "3.0.0"
 description = "Análise exploratória do seu export do Letterboxd em um relatório HTML interativo de arquivo único"
 readme = "README.md"
 license = { text = "MIT" }
@@ -17,9 +17,11 @@ classifiers = [
     "Topic :: Multimedia :: Video",
 ]
 dependencies = [
+    "numpy>=1.24",
     "pandas>=2.0",
     "plotly>=5.18",
     "requests>=2.31",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]

@@ -20,6 +20,8 @@ import requests
 TMDB_BASE = "https://api.themoviedb.org/3"
 DEFAULT_CACHE = Path("tmdb_cache.json")
 WORKERS = 8  # requisições em paralelo (limite do TMDB é ~50/s)
+CACHE_SCHEMA = 2  # v2: + directors_gender / cast_gender
+META_KEY = "__meta__"  # entrada reservada do cache (nunca é um filme)
 
 
 class TmdbClient:
@@ -92,7 +94,15 @@ class TmdbClient:
             "directors": [
                 c["name"] for c in m.get("credits", {}).get("crew", []) if c.get("job") == "Director"
             ],
+            # gender do TMDB: 0=desconhecido, 1=feminino, 2=masculino, 3=não-binário
+            "directors_gender": [
+                c.get("gender", 0)
+                for c in m.get("credits", {}).get("crew", [])
+                if c.get("job") == "Director"
+            ],
             "cast": [c["name"] for c in m.get("credits", {}).get("cast", [])[:8]],
+            "cast_gender": [c.get("gender", 0)
+                            for c in m.get("credits", {}).get("cast", [])[:8]],
             "budget": m.get("budget"),
             "revenue": m.get("revenue"),
             "release_date": m.get("release_date"),
@@ -106,6 +116,7 @@ def load_cache(path: Path = DEFAULT_CACHE) -> dict:
 
 
 def save_cache(cache: dict, path: Path = DEFAULT_CACHE) -> None:
+    cache[META_KEY] = {"schema": CACHE_SCHEMA}
     path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
 
@@ -165,9 +176,42 @@ def enrich(
                     save_cache(cache, cache_path)
         save_cache(cache, cache_path)
 
+    # caches de schema antigo não têm gender; completa só esses campos
+    old = [(k, v["tmdb_id"]) for k, v in cache.items()
+           if k != META_KEY and isinstance(v, dict)
+           and "directors_gender" not in v and v.get("tmdb_id")]
+    if old and not offline and key:
+        client = TmdbClient(key)
+        print(f"Atualizando cache (schema v{CACHE_SCHEMA}): gender de "
+              f"{len(old)} filmes...")
+
+        def _genders(mid):
+            try:
+                cr = client._get(f"movie/{mid}/credits")
+                return (
+                    [c.get("gender", 0) for c in cr.get("crew", [])
+                     if c.get("job") == "Director"],
+                    [c.get("gender", 0) for c in cr.get("cast", [])[:8]],
+                )
+            except Exception:
+                return None
+
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            futures = {pool.submit(_genders, mid): k for k, mid in old}
+            for i, fut in enumerate(as_completed(futures), 1):
+                res = fut.result()
+                if res is not None:
+                    dg, cg = res
+                    cache[futures[fut]]["directors_gender"] = dg
+                    cache[futures[fut]]["cast_gender"] = cg
+                if i % 200 == 0:
+                    save_cache(cache, cache_path)
+        save_cache(cache, cache_path)
+
     # caches criados antes da v1.6 não têm pôster; completa só esse campo
     stale = [(k, v["tmdb_id"]) for k, v in cache.items()
-             if v and "poster" not in v and v.get("tmdb_id")]
+             if k != META_KEY and isinstance(v, dict)
+             and "poster" not in v and v.get("tmdb_id")]
     if stale and not offline and key:
         client = TmdbClient(key)
         print(f"Baixando pôsteres de {len(stale)} filmes já em cache...")

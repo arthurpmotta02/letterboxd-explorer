@@ -11,9 +11,38 @@ import pandas as pd
 WANTED = ["diary", "watched", "ratings", "watchlist", "reviews", "profile",
           "comments"]
 
+# colunas mínimas esperadas por arquivo do export oficial; se o formato do
+# Letterboxd mudar, falhamos cedo com mensagem clara em vez de KeyError
+REQUIRED_COLS = {
+    "watched": {"Name", "Year"},
+    "diary": {"Name", "Year", "Watched Date"},
+    "ratings": {"Name", "Year", "Rating"},
+    "watchlist": {"Name", "Year"},
+    "reviews": {"Name", "Review"},
+}
+
 
 class ExportError(Exception):
     """Export inválido ou incompleto."""
+
+
+def validate_schema(frames: dict[str, pd.DataFrame]) -> None:
+    """Confere as colunas mínimas de cada CSV presente no export."""
+    problemas = []
+    for name, need in REQUIRED_COLS.items():
+        df = frames.get(name)
+        if df is None:
+            continue
+        faltam = need - set(df.columns)
+        if faltam:
+            problemas.append(f"{name}.csv sem coluna(s): "
+                             + ", ".join(sorted(faltam)))
+    if problemas:
+        raise ExportError(
+            "O export não tem o formato esperado do Letterboxd — "
+            + "; ".join(problemas)
+            + ". O formato mudou? Abra uma issue no repositório."
+        )
 
 
 def parse_dates(s: pd.Series) -> pd.Series:
@@ -37,6 +66,11 @@ def read_export(path: Path) -> dict[str, pd.DataFrame]:
         with zipfile.ZipFile(path) as z:
             for info in z.infolist():
                 stem = Path(info.filename).stem.lower()
+                # só a raiz do ZIP: subpastas como likes/reviews.csv e
+                # deleted/diary.csv têm outro formato e não podem
+                # sobrescrever os arquivos principais
+                if "/" in info.filename.replace("\\", "/"):
+                    continue
                 if stem in WANTED and info.filename.endswith(".csv"):
                     with z.open(info) as f:
                         frames[stem] = pd.read_csv(io.TextIOWrapper(f, "utf-8"))
@@ -50,6 +84,7 @@ def read_export(path: Path) -> dict[str, pd.DataFrame]:
 
     if "watched" not in frames and "diary" not in frames:
         raise ExportError("Não encontrei watched.csv nem diary.csv no export.")
+    validate_schema(frames)
     return frames
 
 

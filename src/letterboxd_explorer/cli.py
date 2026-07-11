@@ -54,6 +54,21 @@ def main(argv: list[str] | None = None) -> None:
                             retry_misses=args.retry_misses,
                             refresh=args.refresh)
 
+        # enriquece a watchlist também: alimenta a "watchlist rankeada"
+        wl = frames.get("watchlist")
+        if wl is not None and len(wl) and {"Name", "Year"} <= set(wl.columns):
+            import pandas as pd
+
+            wl_films = wl[["Name", "Year"]].drop_duplicates().copy()
+            wl_films["Year"] = pd.to_numeric(
+                wl_films["Year"], errors="coerce").astype("Int64")
+            wl_films["Rating"] = pd.NA
+            try:
+                frames["watchlist_enriched"] = tmdb.enrich(
+                    wl_films, args.tmdb_key, args.offline, args.cache)
+            except SystemExit:
+                pass  # sem chave: relatório sai sem a watchlist rankeada
+
         default_name = (f"retrospectiva_{args.year}.html" if args.year
                         else "relatorio_letterboxd.html")
         out = Path(args.output or default_name)
