@@ -10,7 +10,7 @@ O salto de **descritivo → inferencial/preditivo** e de **relatório → produt
 - **Anatomia do seu 5★**: importância de cada família de características (queda de R²).
 - **Generosidade real**: resíduo do modelo por ano — separa "ficou generoso" de "aprendeu a escolher".
 - **Watchlist rankeada**: nota prevista para cada filme da watchlist, treinada no seu histórico (a watchlist agora também é enriquecida via TMDB).
-- **Arquétipos do gosto**: k-means + PCA sobre gênero/década/idioma/keywords, com rótulos automáticos.
+- **Arquétipos do gosto**: KMeans + PCA (scikit-learn) sobre gênero/década/idioma/keywords, com rótulos automáticos.
 
 ### Rigor estatístico
 
@@ -32,8 +32,11 @@ O salto de **descritivo → inferencial/preditivo** e de **relatório → produt
 
 ### Design & UX
 
-- Sistema de cor com significado: verde = volume, laranja = suas notas, divergente azul↔laranja (colorblind-safe) só para "acima/abaixo do esperado", sequencial única para heatmaps, categórica Okabe–Ito para gêneros/clusters.
-- Curadoria do scroll: seções secundárias colapsam em "mais análises".
+- Sistema de cor com significado, na estética Letterboxd: verde = volume, laranja = suas notas, o par azul/laranja da marca como divergente (colorblind-safe) só para "acima/abaixo do esperado", sequencial única para heatmaps, categórica derivada da família da marca para gêneros/clusters.
+- Curadoria do scroll: seções secundárias colapsam em "mais análises"; blocos em ordem narrativa fixa (panorama, tempo, composição, notas, modelo, tendências, pessoas, watchlist).
+- Removidos gráficos redundantes com o modelo (nota média crua por ano, boxplot por gênero, nota por duração, orçamento, acumulado).
+- Calendário de atividade: anos sem atividade viram linhas vazias e o eixo é categórico (corrige anos visualmente fundidos).
+- Retenção de diretores agora mostra os nomes (lollipop colorido pela sua nota média).
 - Scrollspy: a navegação lateral destaca a seção ativa.
 - Aba persistente na URL (#aba-N).
 - Card compartilhável 9:16 com download em PNG (html2canvas).
@@ -41,10 +44,10 @@ O salto de **descritivo → inferencial/preditivo** e de **relatório → produt
 
 ### Engenharia
 
-- `models.py`: ridge, k-means e PCA em numpy puro, sem I/O (testável).
+- `models.py`: ridge analítico (forma fechada, com erros-padrão que o sklearn não expõe) + KMeans/PCA via scikit-learn, sem I/O.
 - Validação de schema do export com erro claro se o formato do Letterboxd mudar.
 - Cache TMDB versionado (schema v2) com backfill incremental de `gender`.
-- `numpy` e `scipy` declarados no pyproject (scipy já era usado).
+- `numpy`, `scipy` e `scikit-learn` declarados no pyproject (scipy já era usado).
 - +26 testes: propriedades (encolhimento nunca extrapola, entropia em [0, log k], predição dentro da escala) e snapshot estrutural do HTML.
 
 ## 2.2.0

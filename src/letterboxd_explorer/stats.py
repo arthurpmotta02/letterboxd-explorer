@@ -110,9 +110,16 @@ def watch_gap(films: pd.DataFrame, diary: pd.DataFrame) -> pd.Series:
 
 
 def weekly_calendar(diary: pd.DataFrame) -> pd.DataFrame:
-    """Filmes por (ano, semana ISO), para o calendário de atividade."""
+    """Filmes por (ano, semana ISO), para o calendário de atividade.
+
+    Anos sem nenhum filme entram como linhas de zeros: sem isso o eixo
+    pula anos e as células parecem se fundir no heatmap.
+    """
     iso = diary["Watched Date"].dt.isocalendar()
     ct = pd.crosstab(iso["year"], iso["week"])
+    if len(ct):
+        anos = range(int(ct.index.min()), int(ct.index.max()) + 1)
+        ct = ct.reindex(anos, fill_value=0)
     return ct.reindex(columns=range(1, 54), fill_value=0)
 
 

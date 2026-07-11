@@ -18,26 +18,27 @@ from letterboxd_explorer.ingest import parse_dates
 BG, CARD, TEXT, MUTED = "#14181c", "#1b2228", "#dfe7ef", "#99aabb"
 GRID = "#242c34"
 
-# ------- sistema de cor com significado (D1) -------
-# volume/contagem = verde de marca; notas suas = laranja; neutro = azul.
+# ------- sistema de cor com significado, na estética Letterboxd -------
+# O trio da marca: verde = volume/contagem, laranja = suas notas,
+# azul = tempo/fila/neutro.
 ORANGE, GREEN, BLUE = "#ff8000", "#00e054", "#40bcf4"
-# divergência ("acima/abaixo do esperado"): azul ↔ laranja, seguro para
-# daltônicos — usada SÓ em você×TMDB e desvios vs. baseline.
-DIV_POS, DIV_NEG, DIV_MID = "#ffb000", "#57a8e8", "#39424d"
+# divergência ("acima/abaixo do esperado"): o próprio azul ↔ laranja da
+# marca, que por sorte é seguro para daltônicos. Usada SÓ em você×TMDB
+# e desvios vs. baseline.
+DIV_POS, DIV_NEG, DIV_MID = ORANGE, BLUE, "#39424d"
 DIV_SCALE = [[0, DIV_NEG], [0.5, DIV_MID], [1, DIV_POS]]
 # escala sequencial única para intensidade (calendário, heatmaps)
 SEQ_SCALE = [[0, "#20262c"], [0.01, "#0e4429"], [0.4, "#26a641"],
              [1, "#39d353"]]
-# categórica inspirada em Okabe–Ito (clara p/ fundo escuro): gêneros,
-# clusters, idiomas — categorias distintas em vez de tons de verde.
-CAT = ["#56b4e9", "#e69f00", "#00c48f", "#f0e442", "#cc79a7",
-       "#ff7043", "#9fd356", "#b39ddb"]
+# categórica derivada da família da marca (verde/laranja/azul + tons):
+# gêneros, clusters, idiomas — distintas entre si, sem sair da estética.
+CAT = [GREEN, ORANGE, BLUE, "#f4d35e", "#00a875", "#ffb473",
+       "#1b6e9e", "#99aabb"]
 PALETTE = CAT
-PURPLE, PINK, YELLOW, RED = "#b39ddb", "#cc79a7", "#f0e442", DIV_NEG
+PURPLE, PINK, YELLOW, RED = "#1b6e9e", "#ffb473", "#f4d35e", DIV_NEG
 GRAD = {
     GREEN: "#0e4429", ORANGE: "#5c2e00", BLUE: "#0f3a52",
-    PURPLE: "#2e1b4d", PINK: "#4d1230", YELLOW: "#4d3f00",
-    DIV_POS: "#4d3300", DIV_NEG: "#173a56",
+    PURPLE: "#0d2f42", PINK: "#4d2a12", YELLOW: "#4d3f00",
 }
 PT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
              "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
@@ -178,7 +179,6 @@ SAVE_FIGS = {
     "Maiores divergências vs. TMDB": "maiores_divergencias",
     "Lançamento × visualização": "lancamento_x_visualizacao",
     "Popularidade × avaliação": "popularidade_x_avaliacao",
-    "Distribuição das notas por gênero": "boxplot_generos",
     "Evolução dos gêneros": "evolucao_generos",
     "Sazonalidade dos gêneros, testada": "sazonalidade_generos",
     "Keywords (microgêneros)": "keywords_microgeneros",
@@ -191,6 +191,7 @@ SAVE_FIGS = {
     "Generosidade real ao longo do tempo": "generosidade_real",
     "Arquétipos do seu gosto": "arquetipos_gosto",
     "Nota por gênero, com incerteza": "nota_genero_incerteza",
+    "Quem te fisgou: retenção de diretores": "retencao_diretores",
     "Exploração × explotação": "exploracao_explotacao",
     "Mainstream ↔ cult ao longo do tempo": "mainstream_cult",
     "O que você escreve × a nota que você dá": "sentimento_resenhas",
@@ -583,19 +584,13 @@ def _build_content(
                             [.4, "#26a641"], [1, "#39d353"]],
                 zmin=0, showscale=False, xgap=2.5, ygap=5,
                 hovertemplate="semana %{x} de %{y}: %{z} filmes<extra></extra>"))
+            # type="category": sem isso o Plotly lê "2019" como número e
+            # funde visualmente os anos quando algum fica sem atividade
             fig.update_layout(xaxis_title="semana do ano",
-                              yaxis=dict(autorange="reversed"))
+                              yaxis=dict(autorange="reversed",
+                                         type="category"))
             add(G, "Calendário de atividade", f"Filmes por semana{note}",
                 fig, max(230, 140 + 44 * len(cal)))
-
-        cum = stats.cumulative_films(diary)
-        fig = go.Figure(go.Scatter(
-            x=cum.index, y=cum.values, mode="lines",
-            line=dict(color=BLUE, width=2.5),
-            fill="tozeroy", fillcolor="rgba(64,188,244,.10)",
-            hovertemplate="%{x|%d/%m/%Y}: %{y} filmes<extra></extra>"))
-        fig.update_layout(yaxis_title="total acumulado")
-        add(G, "Acumulado de visualizações", f"Total acumulado{note}", fig, 360)
 
         if len(diary) >= 30:
             hm = pd.crosstab(diary["Watched Date"].dt.dayofweek,
@@ -627,19 +622,6 @@ def _build_content(
         add(G, "Distribuição das notas",
             f"{len(rated)} filmes avaliados · mediana {rated['Rating'].median():.1f}★",
             fig, 380)
-
-    if has_diary:
-        yearly = stats.rating_over_time(diary, films)
-        if len(yearly) >= 2:
-            fig = go.Figure(go.Scatter(
-                x=yearly.index, y=yearly.values, mode="lines+markers",
-                line=dict(color=ORANGE, width=2.5),
-                marker=dict(size=9, color=ORANGE, line=dict(width=2, color=CARD)),
-                hovertemplate="%{x}: %{y:.2f}★<extra></extra>"))
-            fig.update_layout(xaxis_title="ano", yaxis_title="nota média",
-                              xaxis=dict(dtick=1))
-            add(G, "Evolução da nota média",
-                "Nota média por ano em que assistiu (mín. 10 notas/ano)", fig, 350)
 
     her = stats.heresies(films)
     if len(her) >= 10:
@@ -845,28 +827,6 @@ def _build_content(
     if len(g):
         add(G, "Filmes por gênero", "Fonte: TMDB", _hbar(g, GREEN), 480)
 
-        expl = rated.explode("genres").dropna(subset=["genres"]) \
-            if "genres" in films else pd.DataFrame()
-        if len(expl) >= 30:
-            top8 = expl["genres"].value_counts().head(8).index
-            expl8 = expl[expl["genres"].isin(top8)]
-            order = expl8.groupby("genres")["Rating"].median().sort_values().index
-            fig = go.Figure()
-            for i, gen in enumerate(order):
-                fig.add_trace(go.Box(
-                    x=expl8.loc[expl8["genres"] == gen, "Rating"], name=gen,
-                    marker_color=PALETTE[i % len(PALETTE)], boxmean=True,
-                    orientation="h", boxpoints=False))
-            fig.update_layout(showlegend=False, xaxis_title="sua nota (★)",
-                              xaxis=dict(dtick=0.5))
-            fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
-            add(G, "Distribuição das notas por gênero",
-                "Boxplot nos 8 gêneros mais vistos (traço central = mediana, "
-                "linha tracejada = média). Atenção: um filme com N gêneros "
-                "conta em N caixas — para o efeito <i>isolado</i> de cada "
-                "gênero, veja \"O que de fato eleva a sua nota\".",
-                fig, 460, secondary=True)
-
         sg = stats.shrunk_group(films, "genres", min_count=5, top=12)
         if len(sg) >= 4:
             sg = sg.sort_values("bayes")
@@ -967,32 +927,6 @@ def _build_content(
                 f"Mediana {rt.median():.0f} min · mais longo: "
                 f"<b>{longest['Name']}</b> ({int(longest['runtime'])} min)",
                 fig, 380, secondary=True)
-
-    rr = stats.rating_by_runtime(films)
-    if len(rr) >= 3:
-        fig = go.Figure(go.Bar(
-            x=[str(i) for i in rr.index], y=rr["mean"],
-            marker=dict(color=list(rr["mean"]),
-                        colorscale=[[0, GRAD[BLUE]], [1, BLUE]], line_width=0),
-            customdata=rr["count"],
-            hovertemplate="%{x}: %{y:.2f}★ (%{customdata} filmes)<extra></extra>"))
-        fig.update_yaxes(range=[max(0, rr["mean"].min() - .5),
-                                min(5, rr["mean"].max() + .3)])
-        fig.update_layout(xaxis_title="duração", yaxis_title="nota média")
-        add(G, "Avaliação por faixa de duração",
-            "Mín. 5 filmes avaliados por faixa · para o efeito controlado "
-            "da duração, veja o modelo do gosto", fig, 360, secondary=True)
-
-    bb = stats.budget_buckets(films)
-    if len(bb) and bb.sum() >= 20:
-        fig = go.Figure(go.Bar(
-            x=[str(i) for i in bb.index], y=bb.values,
-            marker=dict(color=list(bb.values),
-                        colorscale=[[0, GRAD[GREEN]], [1, GREEN]], line_width=0),
-            hovertemplate="%{x}: %{y} filmes<extra></extra>"))
-        fig.update_layout(yaxis_title="filmes")
-        add(G, "Distribuição por orçamento de produção",
-            "Quando informado no TMDB", fig, 360, secondary=True)
 
     if ("tmdb_votes" in films and "poster" in films
             and films["tmdb_votes"].notna().any()):
@@ -1096,26 +1030,32 @@ def _build_content(
                 "de 95%.", fig, 380)
 
         ret = stats.director_retention(films)
-        if ret is not None and len(ret) >= 3:
-            hooked = stats.hooked_directors(films, diary)
+        hooked = stats.hooked_directors(films, diary, top=12)
+        if ret is not None and hooked is not None and len(hooked) >= 3:
             n1 = int(ret.loc[1, "diretores"]) if 1 in ret.index else 0
             n3 = int(ret[ret.index >= 3]["diretores"].sum())
-            fig = go.Figure(go.Bar(
-                x=[str(i) for i in ret.index], y=ret["diretores"],
-                marker=dict(color=list(ret["diretores"]),
-                            colorscale=[[0, GRAD[GREEN]], [1, GREEN]],
-                            line_width=0),
-                hovertemplate="%{y} diretores com %{x} filme(s)"
-                              "<extra></extra>"))
-            fig.update_layout(xaxis_title="filmes vistos do diretor",
-                              yaxis_title="diretores", yaxis_type="log")
-            top_h = (", ".join(hooked.head(3).index)
-                     if hooked is not None and len(hooked) else "")
+            h = hooked.sort_values("n")
+            fig = go.Figure(go.Scatter(
+                x=h["n"], y=list(h.index), mode="markers",
+                marker=dict(size=12, color=h["nota"].fillna(h["nota"].mean()),
+                            colorscale="Viridis",
+                            colorbar=dict(title="nota", outlinewidth=0,
+                                          tickfont=dict(color=TEXT)),
+                            line=dict(width=1.5, color=CARD)),
+                customdata=h["nota"],
+                hovertemplate="%{y}: %{x} filmes · sua média "
+                              "%{customdata:.2f}★<extra></extra>"))
+            for name, row in h.iterrows():
+                fig.add_shape(type="line", x0=0, x1=row["n"], y0=name,
+                              y1=name, line=dict(width=2,
+                              color="rgba(153,170,187,.30)"))
+            fig.update_layout(xaxis_title="filmes vistos")
+            fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
             add(G, "Quem te fisgou: retenção de diretores",
-                f"De {n1} diretores experimentados uma única vez, "
-                f"{n3} chegaram a 3+ filmes (te fisgaram de verdade"
-                f"{': ' + top_h if top_h else ''}). Escala log.",
-                fig, 380, secondary=True)
+                f"Diretores com 3+ filmes no seu histórico, coloridos pela "
+                f"sua nota média. Contexto: {n1} diretores ficaram no "
+                f"experimento único; só {n3} te fisgaram de verdade.",
+                fig, max(360, 30 * len(h) + 120))
 
         gr = stats.gender_representation(films, diary)
         if gr is not None and len(gr) >= 3:
@@ -1300,6 +1240,15 @@ def _build_content(
                               annotations=[dict(text="idiomas", showarrow=False,
                                                 font=dict(color=MUTED, size=15))])
             add(G, "Idiomas originais", "", fig, 430, secondary=True)
+
+    # narrativa do relatório: panorama -> quando -> o quê -> como avalia ->
+    # o modelo (síntese e predição) -> tendências -> pessoas -> o que vem.
+    # sort estável: a ordem interna de cada bloco é preservada.
+    ordem = ["Visão geral", "Linha do tempo", "O que você assiste",
+             "Suas notas", "Modelo do gosto", "Exploração e nicho",
+             "Pessoas e lugares", "Watchlist e resenhas"]
+    rank = {g: i for i, g in enumerate(ordem)}
+    sections.sort(key=lambda s: rank.get(s[0], len(ordem)))
 
     facts = insights.generate(films, diary, frames)
     return cards, facts, sections

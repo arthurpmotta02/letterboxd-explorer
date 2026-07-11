@@ -86,21 +86,22 @@ def test_rank_watchlist_empty():
 # ------------------------------------------------------------------ B4
 
 
-def test_kmeans_labels_and_inertia():
-    rng = np.random.default_rng(0)
-    X = np.vstack([rng.normal(0, .3, (30, 4)), rng.normal(3, .3, (30, 4))])
-    lab, C, inertia = models._kmeans(X, 2)
-    assert len(lab) == 60 and C.shape == (2, 4) and inertia >= 0
-    # dois grupos bem separados: labels devem separar as metades
-    assert len(set(lab[:30])) == 1 and len(set(lab[30:])) == 1
-
-
 def test_taste_clusters_shapes():
     films = _big_films(120)
     cl = models.taste_clusters(films)
     assert cl is not None
     assert {"x", "y", "cluster"} <= set(cl["df"].columns)
     assert len(cl["labels"]) >= 2
+    # todo filme pertence a exatamente um cluster e o resumo bate
+    assert len(cl["df"]) == 120
+    assert int(cl["summary"]["n"].sum()) == 120
+
+
+def test_taste_clusters_reproducible():
+    films = _big_films(100)
+    a = models.taste_clusters(films, seed=7)["df"]["cluster"]
+    b = models.taste_clusters(films, seed=7)["df"]["cluster"]
+    assert (a == b).all()
 
 
 # ------------------------------------------------------------------ stats: propriedades

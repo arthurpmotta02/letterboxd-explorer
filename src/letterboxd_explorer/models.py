@@ -1,10 +1,15 @@
-"""Camada de modelagem: ridge, k-means e PCA em numpy puro, sem I/O.
+"""Camada de modelagem: ridge analítico + KMeans/PCA (scikit-learn), sem I/O.
 
-Um único modelo linear (ridge) responde quatro perguntas do roadmap:
+Um único modelo linear (ridge) responde quatro perguntas:
   A1  efeitos parciais sobre a sua nota (forest plot com IC);
   A6  generosidade ao longo do tempo controlada pela composição;
   B1  nota prevista para cada filme da watchlist;
   B2  importância de cada família de features (queda de R²).
+
+O ridge é resolvido em forma fechada (numpy) em vez de
+sklearn.linear_model.Ridge porque o sklearn não expõe os erros-padrão
+dos coeficientes, e os intervalos de confiança são o ponto central do
+relatório. Clustering e projeção 2D usam scikit-learn (KMeans, PCA).
 """
 
 from __future__ import annotations
@@ -287,38 +292,16 @@ def rank_watchlist(films: pd.DataFrame, watchlist: pd.DataFrame,
 # ------------------------------------------------------------------ B4
 
 
-def _kmeans(X: np.ndarray, k: int, n_init: int = 6, iters: int = 60,
-            seed: int = 7) -> tuple[np.ndarray, np.ndarray, float]:
-    """k-means com init k-means++. Retorna (labels, centros, inércia)."""
-    rng = np.random.default_rng(seed)
-    best = (None, None, np.inf)
-    for _ in range(n_init):
-        centers = [X[rng.integers(len(X))]]
-        for _ in range(k - 1):
-            d2 = np.min([((X - c) ** 2).sum(axis=1) for c in centers], axis=0)
-            p = d2 / d2.sum() if d2.sum() > 0 else None
-            centers.append(X[rng.choice(len(X), p=p)])
-        C = np.array(centers)
-        for _ in range(iters):
-            d = ((X[:, None, :] - C[None, :, :]) ** 2).sum(axis=2)
-            lab = d.argmin(axis=1)
-            newC = np.array([X[lab == j].mean(axis=0) if (lab == j).any()
-                             else C[j] for j in range(k)])
-            if np.allclose(newC, C):
-                break
-            C = newC
-        inertia = float(((X - C[lab]) ** 2).sum())
-        if inertia < best[2]:
-            best = (lab, C, inertia)
-    return best
-
-
 def taste_clusters(films: pd.DataFrame, k: int | None = None,
                    min_n: int = 80, seed: int = 7) -> dict | None:
-    """Arquétipos de filme: k-means sobre gênero+década+idioma+keywords.
+    """Arquétipos de filme: KMeans sobre gênero+década+idioma+keywords.
 
-    Retorna dict com df (x, y da PCA, cluster), labels interpretáveis por
-    cluster e resumo (n e nota média por cluster)."""
+    Clustering e projeção 2D via scikit-learn (KMeans com init k-means++
+    e PCA). Retorna dict com df (x, y da PCA, cluster), labels
+    interpretáveis por cluster e resumo (n e nota média por cluster)."""
+    from sklearn.cluster import KMeans
+    from sklearn.decomposition import PCA
+
     need = [c for c in ("genres",) if c in films]
     if not need or len(films) < min_n:
         return None
@@ -344,11 +327,8 @@ def taste_clusters(films: pd.DataFrame, k: int | None = None,
 
     if k is None:
         k = int(np.clip(round(np.sqrt(len(films) / 18)), 4, 7))
-    lab, C, _ = _kmeans(Xs, k, seed=seed)
-
-    # PCA 2D via SVD para o scatter
-    U, S, _ = np.linalg.svd(Xs - Xs.mean(axis=0), full_matrices=False)
-    xy = U[:, :2] * S[:2]
+    lab = KMeans(n_clusters=k, n_init=10, random_state=seed).fit_predict(Xs)
+    xy = PCA(n_components=2, random_state=seed).fit_transform(Xs)
 
     labels, summary = {}, []
     Xm = X.mean()
