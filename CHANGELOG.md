@@ -1,5 +1,32 @@
 # Changelog
 
+## 3.1.0 — 2026-07-11
+
+Rigor: de **preditivo → validado**. O modelo agora prova, fora da amostra, que os números que mostra se sustentam.
+
+### Validação e honestidade do modelo
+
+- **Validação cruzada (k-fold)** no modelo da nota: além do R² de treino, o relatório mostra **CV-R²** e **erro médio (MAE) fora da amostra** — o número honesto. O gap treino−CV expõe overfitting.
+- **`alpha` do ridge escolhido por validação cruzada** em vez de fixado arbitrariamente.
+- **Importância por família medida fora da amostra** (queda de CV-R²): não premia mais famílias com muitos rótulos (diretor, gênero) só por decorarem o treino.
+- **Rótulo honesto do intervalo dos coeficientes**: passa a dizer que é o intervalo de *variância* do estimador encolhido, não corrigido pelo viés do ridge.
+
+### Watchlist com incerteza real
+
+- **Intervalo de previsão por filme** (`pred_lo`/`pred_hi`): soma a incerteza dos coeficientes ao ruído residual. Filmes com poucas pistas conhecidas (cold-start, ex.: diretor fora do vocabulário) saem com faixa larga em vez de falsa confiança.
+
+### Novas análises
+
+- **Curva de calibração** predito × real, usando previsões de validação cruzada (sem vazamento): mostra se, quando o modelo prevê 4.5★, você realmente dá ~4.5★.
+- **Benchmark não-linear (gradient boosting)**: compara o CV-R² do modelo linear com o de um GBM que capta interações — mede quanto do seu gosto NÃO é aditivo (ex.: drama longo sim, comédia longa não).
+- **Watchlist com diversidade (MMR)**: a lista rankeada equilibra nota prevista e variedade, para não devolver vários filmes quase idênticos.
+- **Caveat de viés de seleção**: a watchlist agora diz explicitamente que o modelo aprende só com filmes avaliados, então tende ao que você já conhece.
+
+### Refino
+
+- **Clustering (arquétipos)**: só as features contínuas são padronizadas; as binárias ficam 0/1, para não superpesar categorias raras. O número de clusters `k` é escolhido pela **maior silhueta**, não por heurística.
+- +7 testes de propriedade: CV-R² ≤ R² de treino, alpha vindo do grid, intervalo de previsão contém a previsão, calibração bem formada.
+
 ## 3.0.0 — 2026-07-11
 
 O salto de **descritivo → inferencial/preditivo** e de **relatório → produto**.
@@ -35,25 +62,4 @@ O salto de **descritivo → inferencial/preditivo** e de **relatório → produt
 - Sistema de cor com significado, na estética Letterboxd: verde = volume, laranja = suas notas, o par azul/laranja da marca como divergente (colorblind-safe) só para "acima/abaixo do esperado", sequencial única para heatmaps, categórica derivada da família da marca para gêneros/clusters.
 - Curadoria do scroll: seções secundárias colapsam em "mais análises"; blocos em ordem narrativa fixa (panorama, tempo, composição, notas, modelo, tendências, pessoas, watchlist).
 - Removidos gráficos redundantes com o modelo (nota média crua por ano, boxplot por gênero, nota por duração, orçamento, acumulado).
-- Calendário de atividade: anos sem atividade viram linhas vazias e o eixo é categórico (corrige anos visualmente fundidos).
-- Retenção de diretores agora mostra os nomes (lollipop colorido pela sua nota média).
-- "Os rostos do seu cinema": cards com foto (TMDB) do diretor e do ator mais vistos, por aba/ano.
-- Barra de atalhos fixa no topo (chips clicáveis) para navegar entre os blocos sem scroll.
-- Gradiente de nota laranja > amarelo > verde (estilo do slider do Letterboxd) substitui o Viridis; o scatter de diretores ganhou barra de cor explicando a média bayesiana.
-- Raridades do acervo limitadas a 12; exportação de figuras resiliente (uma falha não aborta as demais); textos do relatório sem travessão.
-- Scrollspy: a navegação lateral destaca a seção ativa.
-- Aba persistente na URL (#aba-N).
-- Card compartilhável 9:16 com download em PNG (html2canvas).
-- Radar com anéis de referência, rede com mais contraste, scatters densos com o gradiente de nota e opacidade.
-
-### Engenharia
-
-- `models.py`: ridge analítico (forma fechada, com erros-padrão que o sklearn não expõe) + KMeans/PCA via scikit-learn, sem I/O.
-- Validação de schema do export com erro claro se o formato do Letterboxd mudar.
-- Cache TMDB versionado (schema v2) com backfill incremental de `gender`.
-- `numpy`, `scipy` e `scikit-learn` declarados no pyproject (scipy já era usado).
-- +26 testes: propriedades (encolhimento nunca extrapola, entropia em [0, log k], predição dentro da escala) e snapshot estrutural do HTML.
-
-## 2.2.0
-
-- Versão anterior: EDA completo, tema escuro, abas por ano, insights estilo Wrapped, média bayesiana para diretores, rede de colaborações, mapa de países.
+- Calendário de at

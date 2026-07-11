@@ -64,7 +64,7 @@ Os blocos seguem uma narrativa fixa: panorama, quando você assiste, o que assis
 | **Linha do tempo** | Volume mensal com changepoint testado, calendário estilo GitHub, padrão semanal |
 | **O que você assiste** | Décadas, defasagem até assistir, fases (lançamento vs. visualização), gêneros e evolução, sazonalidade com teste qui-quadrado, keywords, duração, raridades, rewatches com teste |
 | **Suas notas** | Distribuição, calibração vs. TMDB (Spearman), divergências, nota por gênero com IC, favoritos mais pessoais, joias escondidas |
-| **Modelo do gosto** | Efeitos parciais com IC (forest plot), anatomia do 5 estrelas, generosidade real, watchlist rankeada, arquétipos (KMeans + PCA) |
+| **Modelo do gosto** | Efeitos parciais com IC (forest plot) e R² de validação cruzada, anatomia do 5 estrelas (importância validada fora da amostra), benchmark linear × não-linear (gradient boosting), curva de calibração predito × real, generosidade real, watchlist rankeada com faixa de previsão e diversidade, arquétipos (KMeans + PCA) |
 | **Exploração e nicho** | Entropia e taxa de inéditos por ano, mainstream vs. cult, retenção de diretores nome a nome, direção feminina |
 | **Pessoas e lugares** | Rostos do seu cinema (fotos de diretor e ator mais vistos), scatter de diretores com consistência, rede diretor-ator, mapa-múndi, idiomas |
 | **Watchlist e resenhas** | Crescimento da fila, sentimento do texto vs. estrelas, palavras-assinatura |
@@ -161,14 +161,16 @@ Três princípios guiam as análises: **mostrar incerteza** (média sem interval
 A peça central é uma regressão ridge com a sua nota como resposta e, como preditores, dummies de gênero, década, diretores recorrentes, idioma e ano em que você assistiu, mais duração e popularidade (log de votos) como variáveis contínuas. Três propriedades importam:
 
 1. Os coeficientes são **efeitos parciais**: o "bônus de Drama" é estimado controlando por década, diretor e tudo o mais, o que também corrige a contagem múltipla de filmes com vários gêneros.
-2. A penalização $\alpha$ **encolhe amostras pequenas**, cumprindo o papel de um prior bayesiano: um diretor com 3 filmes não ganha efeito gigante por sorte.
-3. O mesmo modelo é reutilizado três vezes: os coeficientes viram o forest plot, a queda de $R^2$ ao remover cada família de features vira a "anatomia do 5 estrelas", e a predição sobre a watchlist vira o ranking do que assistir.
+2. A penalização $\alpha$ **encolhe amostras pequenas**, cumprindo o papel de um prior bayesiano (um diretor com 3 filmes não ganha efeito gigante por sorte), e é **escolhida por validação cruzada**, não fixada arbitrariamente.
+3. O mesmo modelo é reutilizado: os coeficientes viram o forest plot, a queda de $R^2$ **fora da amostra** ao remover cada família de features vira a "anatomia do 5 estrelas" (medir no treino inflaria famílias com muitos rótulos, como diretor e gênero), e a predição sobre a watchlist vira o ranking do que assistir.
 
-Os intervalos exibidos são ICs de 95% aproximados, com
+**Números honestos, fora da amostra.** Além do $R^2$ de treino, o relatório mostra o **$R^2$ e o erro médio (MAE) de validação cruzada** (k-fold); o gap entre os dois expõe overfitting. Uma **curva de calibração** compara a nota prevista (out-of-fold) com a nota real, e um **benchmark não-linear** (gradient boosting) mede quanto do seu gosto vive em interações que o modelo aditivo não capta.
+
+Os intervalos dos coeficientes são de **variância do estimador encolhido**, não corrigidos pelo viés do próprio ridge — o relatório os rotula assim, sem fingir que são ICs frequentistas exatos:
 
 $$\widehat{\mathrm{Var}}(\hat\beta) = \hat\sigma^2 \, A^{-1} X^\top X \, A^{-1}, \qquad A = X^\top X + \alpha I.$$
 
-O ridge é resolvido em forma fechada (numpy) porque o scikit-learn não expõe erros-padrão de coeficientes; clustering e projeção 2D usam scikit-learn (KMeans com k-means++ e PCA).
+O ridge é resolvido em forma fechada (numpy) porque o scikit-learn não expõe a covariância dos coeficientes; clustering e projeção 2D usam scikit-learn (KMeans com k-means++ e PCA).
 
 ### Generosidade sem viés de seleção
 
@@ -184,7 +186,7 @@ e IC de 95%; onde as barras se sobrepõem, o texto avisa que a diferença não �
 
 ### Watchlist, clusters e texto
 
-A watchlist é enriquecida no TMDB e pontuada pelo modelo; a predição nunca usa os dummies de "ano em que viu" (não se prevê o passado). Os **arquétipos** vêm de KMeans sobre gênero, década, idioma e keywords padronizados, projetados em 2D por PCA, com rótulos extraídos das features que mais distinguem cada cluster. Nas resenhas, o sentimento é **léxico** (listas pt/en compactas, sinalizado como heurístico) e as palavras-assinatura ponderam frequência por espalhamento, $\mathrm{tf} \cdot \log(1+\mathrm{df})$. A variedade anual de repertório usa entropia de Shannon normalizada, $H/\log k \in [0, 1]$.
+A watchlist é enriquecida no TMDB e pontuada pelo modelo; a predição nunca usa os dummies de "ano em que viu" (não se prevê o passado). Cada filme sai com uma **faixa de previsão** que propaga a covariância dos coeficientes mais o ruído residual, então filmes com poucas pistas conhecidas (diretor fora do vocabulário) recebem intervalo largo em vez de falsa confiança; um re-rank por **MMR** equilibra nota prevista e variedade, para a lista não repetir o mesmo tipo de filme. Como o modelo aprende só com filmes avaliados — um recorte não-aleatório do que você vê —, o relatório avisa que o ranking tende ao que você já conhece. Os **arquétipos** vêm de KMeans sobre gênero, década, idioma e keywords padronizados, projetados em 2D por PCA, com rótulos extraídos das features que mais distinguem cada cluster. Nas resenhas, o sentimento é **léxico** (listas pt/en compactas, sinalizado como heurístico) e as palavras-assinatura ponderam frequência por espalhamento, $\mathrm{tf} \cdot \log(1+\mathrm{df})$. A variedade anual de repertório usa entropia de Shannon normalizada, $H/\log k \in [0, 1]$.
 
 ### Cor com significado
 
@@ -195,7 +197,8 @@ Toda a paleta deriva do trio da marca Letterboxd. Verde para volume e contagem; 
 * **Curva de sobrevivência da watchlist** ficou de fora por limitação do dado, não da técnica: o export não traz a data de adição dos filmes que *saíram* da lista, o que enviesaria a curva por construção.
 * **Campo `gender` do TMDB** é incompleto e binário-centrado; a seção de direção feminina exibe a cobertura do dado e pede leitura como aproximação.
 * **Sentimento léxico** é uma heurística com listas compactas de palavras pt/en; ironia, negação e contexto escapam. O gráfico existe para calibração aproximada entre texto e estrela, não como análise de sentimento de produção.
-* **ICs do ridge são aproximados** (fórmula sanduíche com $\sigma^2$ homoscedástico); com poucas notas o próprio relatório omite o modelo.
+* **Intervalos do ridge** são de variância do estimador encolhido, não corrigidos pelo viés do encolhimento (o relatório os rotula assim); com poucas notas ele omite o modelo. Como contrapeso, $R^2$, erro (MAE) e importância vêm de validação cruzada, e uma curva de calibração mostra se as previsões batem com a realidade.
+* **Viés de seleção**: o modelo treina só com filmes que você avaliou (um recorte não-aleatório do que assiste), então a watchlist rankeada tende ao que você já conhece — sinalizado no relatório.
 * **Casamento com o TMDB por título e ano** pode errar em raros homônimos; `--refresh` corrige caso a caso.
 * **Export do Letterboxd** pode exigir assinatura Pro para contas free.
 

@@ -485,11 +485,15 @@ def _build_content(
                           legend=dict(orientation="h", y=1.08),
                           margin=dict(l=10))
         fig.update_yaxes(gridcolor="rgba(0,0,0,0)", tickfont=dict(size=11.5))
+        cv_txt = (f", validação cruzada {model['cv_r2']:.0%}, erro médio "
+                  f"±{model['cv_mae']:.1f}★"
+                  if model.get("cv_r2") == model.get("cv_r2") else "")
         add(G, "O que de fato eleva a sua nota",
             f"Efeitos parciais de um modelo ridge sobre {model['n']} filmes "
-            f"avaliados (R² = {model['r2']:.0%}). Cada efeito é controlado "
-            "pelos demais: é o \"bônus\" da característica, não a média "
-            "marginal, e a barra é o IC de 95%.",
+            f"avaliados (R² de treino {model['r2']:.0%}{cv_txt}). Cada efeito é "
+            "controlado pelos demais: é o \"bônus\" da característica, não a "
+            "média marginal. A barra é o intervalo de variância do estimador "
+            "encolhido (não corrigido pelo viés do ridge).",
             fig, max(420, 24 * len(show) + 140))
 
         imp = model["importance"]
@@ -500,13 +504,36 @@ def _build_content(
                 marker=dict(color=[fam_color.get(f, BLUE)
                                    for f in imp.index[::-1]], line_width=0),
                 hovertemplate="%{y}: %{x:.1%} do R²<extra></extra>"))
-            fig.update_layout(xaxis_title="queda de R² ao remover a família",
-                              xaxis_tickformat=".0%", bargap=0.4)
+            fig.update_layout(
+                xaxis_title="queda de R² fora da amostra ao remover a família",
+                xaxis_tickformat=".0%", bargap=0.4)
             fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
             add(G, "Anatomia do seu 5★",
-                "O que mais move a sua avaliação: quanto o modelo piora "
-                "quando cada família de características é removida.",
+                "O que mais move a sua avaliação: quanto o modelo piora, "
+                "em validação cruzada, quando cada família de características "
+                "é removida. Medir fora da amostra evita premiar famílias com "
+                "muitos rótulos (diretor, gênero) só por decorarem o treino.",
                 fig, 340)
+
+        bench = models.nonlinear_benchmark(films, diary, model=model)
+        if bench is not None:
+            fig = go.Figure(go.Bar(
+                x=[bench["ridge_cv_r2"], bench["gbm_cv_r2"]],
+                y=["linear (ridge)", "não-linear (boosting)"],
+                orientation="h",
+                marker=dict(color=[BLUE, GREEN], line_width=0),
+                hovertemplate="%{y}: CV-R² %{x:.1%}<extra></extra>"))
+            fig.update_layout(xaxis_tickformat=".0%",
+                              xaxis_title="R² em validação cruzada", bargap=0.5)
+            fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
+            g_txt = ("há sinal em combinações de características (ex.: você "
+                     "gosta de drama longo, mas não de comédia longa)"
+                     if bench["gain"] > 0.03 else
+                     "pouco: seu gosto é bem descrito por efeitos aditivos")
+            add(G, "Seu gosto é linear?",
+                f"Quanto um modelo que capta interações supera o linear. "
+                f"Ganho de {bench['gain']:+.0%} — {g_txt}.",
+                fig, 240)
 
         rby = model["resid_by_year"]
         if rby is not None:
@@ -534,19 +561,54 @@ def _build_content(
                 "generoso do que o seu padrão para aquele tipo de filme, "
                 "descontado o efeito de \"escolher melhor\".", fig, 380)
 
+        cal_fit = models.rating_calibration(films, diary, model=model)
+        if cal_fit is not None and len(cal_fit) >= 3:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=[0.5, 5], y=[0.5, 5], mode="lines",
+                line=dict(color=MUTED, dash="dot"),
+                hoverinfo="skip", showlegend=False))
+            fig.add_trace(go.Scatter(
+                x=cal_fit["pred"], y=cal_fit["real"], mode="lines+markers",
+                error_y=dict(type="data", symmetric=False,
+                             array=cal_fit["hi"] - cal_fit["real"],
+                             arrayminus=cal_fit["real"] - cal_fit["lo"],
+                             color="rgba(153,170,187,.5)", thickness=1.5,
+                             width=4),
+                line=dict(color=GREEN, width=2.5),
+                marker=dict(size=9, color=GREEN,
+                            line=dict(width=2, color=CARD)),
+                customdata=cal_fit["n"],
+                hovertemplate="prevista %{x:.1f}★ → real %{y:.2f}★ "
+                              "(%{customdata} filmes)<extra></extra>",
+                showlegend=False))
+            fig.update_layout(
+                xaxis_title="nota prevista (fora da amostra)",
+                yaxis_title="nota real média")
+            add(G, "O modelo está bem calibrado?",
+                "Cada ponto agrupa filmes com nota prevista parecida, usando "
+                "previsões de validação cruzada (sem espiar a resposta). Sobre "
+                "a linha pontilhada = a previsão bate com a realidade.",
+                fig, 380)
+
     if main:
         wl_enr = frames.get("watchlist_enriched")
-        ranked = models.rank_watchlist(films, wl_enr, diary, model=model) \
+        ranked = models.rank_watchlist(films, wl_enr, diary, model=model,
+                                       diversify=0.3) \
             if model is not None and wl_enr is not None else None
         if ranked is not None and len(ranked) >= 5:
             sub = (f"As maiores notas que o modelo prevê que <i>você</i> "
-                   f"daria, entre {len(wl_enr)} filmes da watchlist "
-                   f"(incerteza típica ±{model['sigma']:.1f}★). "
-                   "É o \"o que assistir a seguir\" treinado no seu gosto.")
+                   f"daria, entre {len(wl_enr)} filmes da watchlist. Cada "
+                   "filme traz a faixa provável (intervalo de previsão de 95%); "
+                   "filmes com poucas pistas conhecidas saem com faixa mais "
+                   "larga, e a seleção prioriza variedade para não repetir o "
+                   "mesmo tipo de filme. Como o modelo só aprende com o que "
+                   "você já avaliou, ele tende ao que você conhece.")
             if "poster" in ranked and ranked["poster"].notna().sum() >= 5:
                 items = [dict(name=r.Name, year=r.Year, poster=r.poster,
                               badge=f"{r.pred:.1f}★",
-                              lines=[f"prevista {r.pred:.1f}★"])
+                              lines=[f"prevista {r.pred:.1f}★",
+                                     f"faixa {r.pred_lo:.1f}–{r.pred_hi:.1f}★"])
                          for r in ranked.head(12).itertuples()]
                 add_html(G, "Watchlist rankeada pelo seu gosto", sub,
                          _poster_grid(items))

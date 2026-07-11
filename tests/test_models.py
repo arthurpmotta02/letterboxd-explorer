@@ -64,6 +64,24 @@ def test_importance_nonnegative():
     assert (m["importance"] >= 0).all()
 
 
+def test_cv_metrics_present_and_sane():
+    m = models.rating_model(_big_films(300))
+    assert np.isfinite(m["cv_r2"]) and np.isfinite(m["cv_mae"])
+    assert m["cv_mae"] >= 0
+    assert m["cv_r2"] <= m["r2"] + 1e-9  # fora da amostra não supera o treino
+    assert m["alpha"] in (0.3, 1.0, 3.0, 10.0, 30.0, 100.0)  # veio do grid de CV
+    assert m["cv_pred"].index.equals(
+        _big_films(300).dropna(subset=["Rating"]).index)
+
+
+def test_select_alpha_returns_from_grid():
+    films = _big_films(200)
+    spec = models.build_spec(films)
+    X = models.transform(films, spec)
+    a, r2 = models.select_alpha(X, films["Rating"])
+    assert a in (0.3, 1.0, 3.0, 10.0, 30.0, 100.0)
+
+
 # ------------------------------------------------------------------ B1
 
 
@@ -81,6 +99,51 @@ def test_rank_watchlist_within_scale():
 def test_rank_watchlist_empty():
     films = _big_films()
     assert models.rank_watchlist(films, pd.DataFrame()) is None
+
+
+def test_rank_watchlist_prediction_interval():
+    films = _big_films()
+    wl = _big_films(40, seed=9).drop(columns=["Rating"])
+    wl["Rating"] = pd.NA
+    ranked = models.rank_watchlist(films, wl)
+    assert {"pred_lo", "pred_hi"} <= set(ranked.columns)
+    assert (ranked["pred_lo"] <= ranked["pred"] + 1e-9).all()
+    assert (ranked["pred"] <= ranked["pred_hi"] + 1e-9).all()
+    assert (ranked["pred_hi"] >= ranked["pred_lo"]).all()
+
+
+def test_rank_watchlist_diversify_valid():
+    films = _big_films(200)
+    wl = _big_films(80, seed=9).drop(columns=["Rating"])
+    wl["Rating"] = pd.NA
+    ranked = models.rank_watchlist(films, wl, top=10, diversify=0.3)
+    assert ranked is not None
+    assert len(ranked) <= 10
+    assert ranked["pred"].between(0.5, 5.0).all()
+    assert {"pred_lo", "pred_hi"} <= set(ranked.columns)
+
+
+def test_mmr_pure_relevance_matches_topk():
+    # lam=1 (só relevância) deve escolher os top-k por score, em ordem
+    scores = np.array([0.1, 0.9, 0.5, 0.7])
+    feats = np.eye(4)
+    order = models._mmr_order(scores, feats, lam=1.0, top=2)
+    assert order[0] == 1 and order[1] == 3
+
+
+def test_rating_calibration_shape():
+    cal = models.rating_calibration(_big_films(300))
+    assert cal is not None
+    assert {"pred", "real", "lo", "hi", "n"} <= set(cal.columns)
+    assert (cal["hi"] >= cal["lo"]).all()
+    assert int(cal["n"].sum()) > 0
+
+
+def test_nonlinear_benchmark_keys():
+    b = models.nonlinear_benchmark(_big_films(200))
+    assert b is not None
+    assert {"ridge_cv_r2", "gbm_cv_r2", "gain", "n"} <= set(b)
+    assert b["gain"] == pytest.approx(b["gbm_cv_r2"] - b["ridge_cv_r2"])
 
 
 # ------------------------------------------------------------------ B4
@@ -104,7 +167,7 @@ def test_taste_clusters_reproducible():
     assert (a == b).all()
 
 
-# ------------------------------------------------------------------ stats: propriedades
+# ------------------------------------------------------------- stats: propriedades
 
 
 def test_shrinkage_never_extrapolates():
@@ -155,7 +218,7 @@ def test_signature_words_spread_beats_burst():
     reviews = pd.DataFrame({
         "Name": [f"F{i}" for i in range(8)],
         "Year": [2000] * 8,
-        # "cinema" aparece 1× em cada resenha; "zumbi" 8× numa só
+        # "cinema" aparece 1x em cada resenha; "zumbi" 8x numa só
         "Review": ["cinema clássico sempre"] * 7
         + ["cinema " + "zumbi " * 8],
     })
