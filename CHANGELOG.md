@@ -37,10 +37,14 @@ O salto de **descritivo → inferencial/preditivo** e de **relatório → produt
 - Removidos gráficos redundantes com o modelo (nota média crua por ano, boxplot por gênero, nota por duração, orçamento, acumulado).
 - Calendário de atividade: anos sem atividade viram linhas vazias e o eixo é categórico (corrige anos visualmente fundidos).
 - Retenção de diretores agora mostra os nomes (lollipop colorido pela sua nota média).
+- "Os rostos do seu cinema": cards com foto (TMDB) do diretor e do ator mais vistos, por aba/ano.
+- Barra de atalhos fixa no topo (chips clicáveis) para navegar entre os blocos sem scroll.
+- Gradiente de nota laranja > amarelo > verde (estilo do slider do Letterboxd) substitui o Viridis; o scatter de diretores ganhou barra de cor explicando a média bayesiana.
+- Raridades do acervo limitadas a 12; exportação de figuras resiliente (uma falha não aborta as demais); textos do relatório sem travessão.
 - Scrollspy: a navegação lateral destaca a seção ativa.
 - Aba persistente na URL (#aba-N).
 - Card compartilhável 9:16 com download em PNG (html2canvas).
-- Radar com anéis de referência, rede com mais contraste, scatters densos com Viridis e opacidade.
+- Radar com anéis de referência, rede com mais contraste, scatters densos com o gradiente de nota e opacidade.
 
 ### Engenharia
 

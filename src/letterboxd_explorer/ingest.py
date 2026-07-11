@@ -39,7 +39,7 @@ def validate_schema(frames: dict[str, pd.DataFrame]) -> None:
                              + ", ".join(sorted(faltam)))
     if problemas:
         raise ExportError(
-            "O export não tem o formato esperado do Letterboxd — "
+            "O export não tem o formato esperado do Letterboxd: "
             + "; ".join(problemas)
             + ". O formato mudou? Abra uma issue no repositório."
         )

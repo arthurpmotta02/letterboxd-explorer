@@ -34,6 +34,9 @@ SEQ_SCALE = [[0, "#20262c"], [0.01, "#0e4429"], [0.4, "#26a641"],
 # gêneros, clusters, idiomas — distintas entre si, sem sair da estética.
 CAT = [GREEN, ORANGE, BLUE, "#f4d35e", "#00a875", "#ffb473",
        "#1b6e9e", "#99aabb"]
+# gradiente de nota (baixa -> alta): laranja -> amarelo -> verde, o mesmo
+# sentido do slider de estrelas do Letterboxd
+RATING_SCALE = [[0, "#ff8000"], [0.5, "#f4d35e"], [1, "#00e054"]]
 PALETTE = CAT
 PURPLE, PINK, YELLOW, RED = "#1b6e9e", "#ffb473", "#f4d35e", DIV_NEG
 GRAD = {
@@ -263,6 +266,41 @@ def _network_fig(pairs: pd.Series):
     return fig
 
 
+
+def _top_person(films: pd.DataFrame, col: str, pcol: str) -> dict | None:
+    """Pessoa mais recorrente em `col`, com foto (pcol) e sua nota média."""
+    if col not in films:
+        return None
+    from collections import Counter, defaultdict
+
+    cnt: Counter = Counter()
+    prof: dict = {}
+    notas = defaultdict(list)
+    has_prof = pcol in films
+    for _, row in films.iterrows():
+        names = row.get(col)
+        if not isinstance(names, list):
+            continue
+        profs = row.get(pcol) if has_prof else None
+        for i, nm in enumerate(names):
+            cnt[nm] += 1
+            if (isinstance(profs, list) and i < len(profs)
+                    and profs[i] and nm not in prof):
+                prof[nm] = profs[i]
+            r = row.get("Rating")
+            if pd.notna(r):
+                notas[nm].append(float(r))
+    if not cnt:
+        return None
+    nm, n = cnt.most_common(1)[0]
+    if n < 2:
+        return None
+    rs = notas.get(nm) or []
+    return {"name": nm, "n": int(n),
+            "rating": sum(rs) / len(rs) if rs else None,
+            "profile": prof.get(nm)}
+
+
 def _activity(diary: pd.DataFrame | None, frames: dict):
     """Base temporal do relatório.
 
@@ -334,17 +372,24 @@ def build_report(
 
 
 def _export_figs(registry: dict, folder: Path) -> None:
-    """Exporta as figuras principais como PNG (requer o pacote kaleido)."""
+    """Exporta as figuras como PNG (requer kaleido). Falha por figura,
+    nunca em bloco: uma figura problemática não impede as demais."""
     folder.mkdir(parents=True, exist_ok=True)
-    try:
-        for name, (fig, height) in registry.items():
+    ok, falhas = 0, []
+    for name, (fig, height) in registry.items():
+        try:
             fig.write_image(str(folder / f"{name}.png"),
                             width=1000, height=height, scale=2)
-        print(f"✔ {len(registry)} figuras salvas em {folder.resolve()}")
-    except Exception as e:
-        print("! Não foi possível exportar PNGs. Instale: pip install kaleido "
+            ok += 1
+        except Exception as e:
+            falhas.append((name, str(e)))
+    print(f"✔ {ok}/{len(registry)} figuras salvas em {folder.resolve()}")
+    if ok == 0:
+        print("! Nenhuma figura exportada. Instale: pip install kaleido "
               "(requer Google Chrome) ou, sem Chrome: "
-              f"pip install kaleido==0.2.1  ({e})")
+              "pip install kaleido==0.2.1")
+    for name, err in falhas[:6]:
+        print(f"  ! falhou {name}: {err[:90]}")
 
 
 def _build_content(
@@ -444,7 +489,7 @@ def _build_content(
             f"Efeitos parciais de um modelo ridge sobre {model['n']} filmes "
             f"avaliados (R² = {model['r2']:.0%}). Cada efeito é controlado "
             "pelos demais: é o \"bônus\" da característica, não a média "
-            "marginal — e a barra é o IC de 95%.",
+            "marginal, e a barra é o IC de 95%.",
             fig, max(420, 24 * len(show) + 140))
 
         imp = model["importance"]
@@ -486,7 +531,7 @@ def _build_content(
             add(G, "Generosidade real ao longo do tempo",
                 "Resíduo do modelo: sua nota menos a nota prevista pelas "
                 "características do filme. Acima de zero = você foi mais "
-                "generoso do que o seu padrão para aquele tipo de filme — "
+                "generoso do que o seu padrão para aquele tipo de filme, "
                 "descontado o efeito de \"escolher melhor\".", fig, 380)
 
     if main:
@@ -732,7 +777,7 @@ def _build_content(
                 x=pop["tmdb_votes"], y=pop["Rating"], mode="markers",
                 text=pop["Name"],
                 marker=dict(size=7, color=pop["Rating"],
-                            colorscale="Viridis",
+                            colorscale=RATING_SCALE,
                             showscale=False, opacity=.6, line_width=0),
                 hovertemplate="%{text}: %{y}★, %{x} votos<extra></extra>"))
             trend = stats.binned_trend(np.log10(pop["tmdb_votes"]), pop["Rating"])
@@ -778,7 +823,7 @@ def _build_content(
         fig.update_layout(xaxis_title="década de lançamento",
                           yaxis_title="sua nota média")
         add(G, "Avaliação por década de lançamento",
-            "Bolha maior = mais filmes avaliados; a barra é o IC de 95% — "
+            "Bolha maior = mais filmes avaliados; a barra é o IC de 95%: "
             "décadas com poucas notas têm médias pouco confiáveis", fig, 360)
 
     if has_diary:
@@ -807,7 +852,7 @@ def _build_content(
                     x=rv_r["release_year"], y=rv_r["watch_year"], mode="markers",
                     text=rv_r["Name"],
                     marker=dict(size=7, color=rv_r["Rating"], cmin=0.5, cmax=5,
-                                colorscale="Viridis",
+                                colorscale=RATING_SCALE,
                                 opacity=.8, line_width=0,
                                 colorbar=dict(title="nota", outlinewidth=0,
                                               tickfont=dict(color=TEXT))),
@@ -932,7 +977,7 @@ def _build_content(
             and films["tmdb_votes"].notna().any()):
         v = films.dropna(subset=["tmdb_votes"])
         zero = int((v["tmdb_votes"] == 0).sum())
-        rare = v[v["tmdb_votes"] > 0].nsmallest(20, "tmdb_votes")
+        rare = v[v["tmdb_votes"] > 0].nsmallest(12, "tmdb_votes")
         rare = rare[rare["tmdb_votes"] < 200]
         if len(rare) >= 4 and rare["poster"].notna().sum() >= 4:
             sub = "Os registros com menos votos no TMDB em todo o seu histórico"
@@ -957,7 +1002,7 @@ def _build_content(
                         if rwe["p"] < 0.05 else "diferença não conclusiva")
                 rw_sub += (f" · você dá {rwe['rewatch_mean']:.2f}★ em "
                            f"rewatches, {comp} primeiras sessões "
-                           f"({rwe['first_mean']:.2f}★) — {conf} "
+                           f"({rwe['first_mean']:.2f}★), {conf} "
                            f"(p = {rwe['p']:.2f})")
             add(G, "Rewatches mais frequentes", rw_sub,
                 _hbar(rw, GREEN, unit="vezes"), 380, secondary=True)
@@ -1038,7 +1083,7 @@ def _build_content(
             fig = go.Figure(go.Scatter(
                 x=h["n"], y=list(h.index), mode="markers",
                 marker=dict(size=12, color=h["nota"].fillna(h["nota"].mean()),
-                            colorscale="Viridis",
+                            colorscale=RATING_SCALE,
                             colorbar=dict(title="nota", outlinewidth=0,
                                           tickfont=dict(color=TEXT)),
                             line=dict(width=1.5, color=CARD)),
@@ -1075,7 +1120,7 @@ def _build_content(
             add(G, "Direção feminina ao longo do tempo",
                 f"Entre os filmes com dado de gênero no TMDB (cobertura "
                 f"média {cov:.0%}; o campo é incompleto e binário-"
-                "centrado — leia como aproximação).", fig, 380)
+                "centrado; leia como aproximação).", fig, 380)
 
     # ================================================== watchlist e resenhas
     if main:
@@ -1142,13 +1187,36 @@ def _build_content(
                 s = pd.Series(sig["tf"].values, index=sig.index)
                 add(G, "Suas palavras-assinatura",
                     f"Frequentes E espalhadas por muitas das suas "
-                    f"{int(reviews['Review'].notna().sum())} resenhas — uma "
+                    f"{int(reviews['Review'].notna().sum())} resenhas; uma "
                     "resenha longa sozinha não domina o ranking.",
                     _hbar(s[::-1], BLUE, unit="ocorrências"), 560,
                     secondary=True)
 
     # ================================================== pessoas e lugares
     G = "Pessoas e lugares"
+    top_dir = _top_person(films, "directors", "directors_profile")
+    top_act = _top_person(films, "cast", "cast_profile")
+    if top_dir or top_act:
+        cells = ""
+        for role, pp in (("diretor(a) mais visto(a)", top_dir),
+                         ("rosto mais frequente", top_act)):
+            if not pp:
+                continue
+            img = (f'<img src="{POSTER_BASE}{pp["profile"]}" alt="" '
+                   'loading="lazy">' if pp.get("profile")
+                   else '<div class="noface">🎬</div>')
+            meta = f'{pp["n"]} filmes'
+            if pp.get("rating") is not None:
+                meta += f' · sua média {pp["rating"]:.2f}★'
+            cells += (f'<figure class="person">{img}<figcaption>'
+                      f'<div class="prole">{role}</div>'
+                      f'<div class="peoplename">{pp["name"]}</div>'
+                      f'<div class="pmeta">{meta}</div></figcaption></figure>')
+        add_html(G, "Os rostos do seu cinema",
+                 "Quem mais aparece na direção e na tela neste recorte "
+                 "(fotos via TMDB)",
+                 f'<div class="peoplecards">{cells}</div>')
+
     ds = stats.director_stats_full(films, min_count=3)
     if len(ds) >= 5:
         destaque = (set(ds.nlargest(8, "n").index)
@@ -1164,8 +1232,11 @@ def _build_content(
             customdata=np.stack([ds["std"], ds["bayes"]], axis=-1),
             marker=dict(size=ds["n"] / ds["n"].max() * 26 + 10,
                         color=ds["bayes"], cmin=max(0, ds["bayes"].min() - .3),
-                        colorscale="Viridis",
-                        showscale=False, line=dict(width=1.5, color=CARD)),
+                        colorscale=RATING_SCALE,
+                        colorbar=dict(title="média<br>bayesiana",
+                                      outlinewidth=0, thickness=14,
+                                      tickfont=dict(color=TEXT)),
+                        showscale=True, line=dict(width=1.5, color=CARD)),
             hovertemplate=("%{hovertext}: %{x} filmes, %{y:.2f}★ ± "
                            "%{customdata[0]:.2f}<br>média bayesiana "
                            "%{customdata[1]:.2f}★<extra></extra>")))
@@ -1275,9 +1346,9 @@ def _render_tab(cards, facts, sections, idx: int = 0) -> str:
     groups = list(dict.fromkeys(grp for grp, *_ in sections))
     nav = ""
     if len(groups) >= 3:
-        links = " · ".join(f'<a href="#t{idx}-g{k}">{g}</a>'
-                           for k, g in enumerate(groups))
-        nav = f'<div class="quicknav">Ir para: {links}</div>'
+        links = "".join(f'<a href="#t{idx}-g{k}">{g}</a>'
+                        for k, g in enumerate(groups))
+        nav = f'<nav class="quicknav">{links}</nav>'
 
     # curadoria (D2): o essencial abre expandido; o secundário de cada
     # bloco vai para um <details> "mais análises"
@@ -1445,10 +1516,25 @@ def _write_html(tabs, films, diary, frames, out: Path, year):
   .lead {{ color:{TEXT}; font-size:1.02rem; max-width:640px;
            margin: 14px auto 0; }}
   .lead b {{ color:{GREEN}; }}
-  .quicknav {{ text-align:center; color:{MUTED}; font-size:.88rem;
-               margin: 20px 0 4px; }}
-  .quicknav a {{ color:{BLUE}; text-decoration:none; }}
-  .quicknav a:hover {{ text-decoration:underline; }}
+  .quicknav {{ position:sticky; top:58px; z-index:9; display:flex;
+               flex-wrap:wrap; gap:8px; justify-content:center;
+               padding:10px 0 12px; margin:16px 0 4px; background:{BG}; }}
+  .quicknav a {{ color:{TEXT}; background:{CARD}; border:1px solid #2c3440;
+                 border-radius:16px; padding:6px 14px; font-size:.82rem;
+                 text-decoration:none; transition:.15s; }}
+  .quicknav a:hover {{ border-color:{GREEN}; color:{GREEN}; }}
+  .peoplecards {{ display:flex; flex-wrap:wrap; gap:20px;
+                  justify-content:center; padding:22px 10px; }}
+  .person {{ margin:0; text-align:center; width:170px; }}
+  .person img {{ width:120px; height:120px; border-radius:50%;
+                 object-fit:cover; border:2px solid #2c3440; }}
+  .noface {{ width:120px; height:120px; border-radius:50%; margin:0 auto;
+             background:#232b32; display:flex; align-items:center;
+             justify-content:center; font-size:2.4rem;
+             border:2px solid #2c3440; }}
+  .prole {{ color:{MUTED}; text-transform:uppercase; letter-spacing:.1em;
+            font-size:.68rem; font-weight:600; margin-top:10px; }}
+  .peoplename {{ font-size:1.05rem; font-weight:700; margin-top:3px; }}
   #sidenav {{ position:fixed; left:26px; top:50%; transform:translateY(-50%);
               z-index:15; display:none; flex-direction:column;
               max-width:180px; }}

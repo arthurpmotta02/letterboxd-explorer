@@ -20,7 +20,7 @@ import requests
 TMDB_BASE = "https://api.themoviedb.org/3"
 DEFAULT_CACHE = Path("tmdb_cache.json")
 WORKERS = 8  # requisições em paralelo (limite do TMDB é ~50/s)
-CACHE_SCHEMA = 2  # v2: + directors_gender / cast_gender
+CACHE_SCHEMA = 3  # v3: + directors_profile / cast_profile (fotos)
 META_KEY = "__meta__"  # entrada reservada do cache (nunca é um filme)
 
 
@@ -100,9 +100,16 @@ class TmdbClient:
                 for c in m.get("credits", {}).get("crew", [])
                 if c.get("job") == "Director"
             ],
+            "directors_profile": [
+                c.get("profile_path")
+                for c in m.get("credits", {}).get("crew", [])
+                if c.get("job") == "Director"
+            ],
             "cast": [c["name"] for c in m.get("credits", {}).get("cast", [])[:8]],
             "cast_gender": [c.get("gender", 0)
                             for c in m.get("credits", {}).get("cast", [])[:8]],
+            "cast_profile": [c.get("profile_path")
+                             for c in m.get("credits", {}).get("cast", [])[:8]],
             "budget": m.get("budget"),
             "revenue": m.get("revenue"),
             "release_date": m.get("release_date"),
@@ -176,34 +183,41 @@ def enrich(
                     save_cache(cache, cache_path)
         save_cache(cache, cache_path)
 
-    # caches de schema antigo não têm gender; completa só esses campos
+    # caches de schema antigo não têm gender/foto; completa só esses campos
     old = [(k, v["tmdb_id"]) for k, v in cache.items()
-           if k != META_KEY and isinstance(v, dict)
-           and "directors_gender" not in v and v.get("tmdb_id")]
+           if k != META_KEY and isinstance(v, dict) and v.get("tmdb_id")
+           and ("directors_gender" not in v or "directors_profile" not in v)]
     if old and not offline and key:
         client = TmdbClient(key)
-        print(f"Atualizando cache (schema v{CACHE_SCHEMA}): gender de "
-              f"{len(old)} filmes...")
+        print(f"Atualizando cache (schema v{CACHE_SCHEMA}): gender e fotos "
+              f"de {len(old)} filmes...")
 
-        def _genders(mid):
+        def _credits(mid):
             try:
                 cr = client._get(f"movie/{mid}/credits")
+                crew = [c for c in cr.get("crew", [])
+                        if c.get("job") == "Director"]
+                cast = cr.get("cast", [])[:8]
                 return (
-                    [c.get("gender", 0) for c in cr.get("crew", [])
-                     if c.get("job") == "Director"],
-                    [c.get("gender", 0) for c in cr.get("cast", [])[:8]],
+                    [c.get("gender", 0) for c in crew],
+                    [c.get("gender", 0) for c in cast],
+                    [c.get("profile_path") for c in crew],
+                    [c.get("profile_path") for c in cast],
                 )
             except Exception:
                 return None
 
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            futures = {pool.submit(_genders, mid): k for k, mid in old}
+            futures = {pool.submit(_credits, mid): k for k, mid in old}
             for i, fut in enumerate(as_completed(futures), 1):
                 res = fut.result()
                 if res is not None:
-                    dg, cg = res
-                    cache[futures[fut]]["directors_gender"] = dg
-                    cache[futures[fut]]["cast_gender"] = cg
+                    dg, cg, dp, cp = res
+                    entry = cache[futures[fut]]
+                    entry["directors_gender"] = dg
+                    entry["cast_gender"] = cg
+                    entry["directors_profile"] = dp
+                    entry["cast_profile"] = cp
                 if i % 200 == 0:
                     save_cache(cache, cache_path)
         save_cache(cache, cache_path)
